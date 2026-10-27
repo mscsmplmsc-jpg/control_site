@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Мои часы</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Мои часы">
+<meta name="theme-color" content="#f1f2ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12191c" media="(prefers-color-scheme: dark)">
+<style>
+:root{--bg:#f1f2ee;--card:#fff;--ink:#1b2b33;--mute:#667780;--line:#d9ddd6;--acc:#1f5f5b;--onacc:#fff;--gold:#8f6a0c;--bad:#a83232}
+@media(prefers-color-scheme:dark){:root{--bg:#12191c;--card:#1b2428;--ink:#e8ede9;--mute:#8fa0a8;--line:#2b373c;--acc:#5fb3ad;--onacc:#0d1a1a;--gold:#d9b24c;--bad:#e07a7a}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:17px/1.4 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:640px;margin:0 auto;padding:16px 16px 48px}
+h1{font-size:26px;line-height:1.2;margin:8px 0 18px;letter-spacing:-.01em}
+button,input,select{font:inherit;color:inherit}
+label{display:block;margin:0 0 12px;font-size:14px;color:var(--mute)}
+input,select{display:block;width:100%;margin-top:4px;padding:11px 12px;font-size:17px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button{cursor:pointer;border:0;background:none}
+.tile{display:block;width:100%;text-align:left;padding:22px 20px;background:var(--acc);color:var(--onacc);border-radius:16px}
+.tile b{display:block;font-size:24px;margin-bottom:4px}
+.tile span{opacity:.85;font-size:15px}
+.bar{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.bar h1{margin:0}
+.back{color:var(--acc);font-size:17px;padding:8px 8px 8px 0}
+.tabs{display:flex;gap:0;margin:12px 0 18px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tabs button{flex:1;padding:11px 8px;font-size:16px;color:var(--mute)}
+.tabs button.on{background:var(--acc);color:var(--onacc);font-weight:600}
+.lbl{font-size:14px;color:var(--mute);margin:6px 0 6px}
+.row{display:grid;grid-template-columns:1fr 96px 40px;gap:8px;margin-bottom:8px}
+.row input{margin:0}
+.x{font-size:24px;color:var(--mute);border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.ghost{color:var(--acc);padding:10px 0;font-size:16px}
+.sum{display:flex;justify-content:space-between;align-items:baseline;margin:10px 0 16px;padding-top:12px;border-top:1px solid var(--line)}
+.sum b{font-size:22px;font-variant-numeric:tabular-nums}
+.primary{width:100%;padding:15px;border-radius:12px;background:var(--acc);color:var(--onacc);font-weight:600;font-size:18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.total{margin:8px 0 4px;padding:18px 16px;border-radius:16px;background:var(--card);border:1px solid var(--line)}
+.total span{display:block;font-size:14px;color:var(--mute)}
+.total b{display:block;font-size:44px;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--gold);letter-spacing:-.02em}
+.mute{color:var(--mute);font-size:14px}
+h2{font-size:18px;margin:26px 0 8px}
+.tr{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.tr span:last-child{font-variant-numeric:tabular-nums;white-space:nowrap}
+.day{padding:12px 0;border-bottom:1px solid var(--line)}
+.dh{display:flex;justify-content:space-between;gap:10px}
+.dh b:last-child{font-variant-numeric:tabular-nums;color:var(--gold)}
+.del{color:var(--bad);font-size:14px;padding:6px 0 0}
+details{margin-top:28px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+summary{cursor:pointer}
+details p{font-size:14px;color:var(--mute);margin:10px 0}
+.sm{display:inline-block;padding:10px 14px;margin:0 8px 6px 0;border:1px solid var(--acc);border-radius:10px;color:var(--acc);font-size:16px}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:90%;padding:12px 18px;border-radius:12px;background:var(--ink);color:var(--bg);font-size:15px;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+[hidden]{display:none!important}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<main>
+<section id="menu">
+  <h1>Главное меню</h1>
+  <button class="tile" data-go="hours"><b>Учет часов</b><span>Занятия, студии и заработок за период</span></button>
+</section>
+
+<section id="hours" hidden>
+  <div class="bar"><button class="back" data-go="menu">‹ Меню</button></div>
+  <h1>Учет часов</h1>
+  <nav class="tabs"><button data-tab="add" class="on">Добавить день</button><button data-tab="stats">Статистика</button></nav>
+
+  <div id="tab-add">
+    <form id="f" autocomplete="off">
+      <label>Студия<input id="studio" list="studios" required placeholder="Название студии"></label>
+      <label>Дата<input id="date" type="date" required></label>
+      <div class="lbl">Ученики на занятии и цена занятия</div>
+      <div id="rows"></div>
+      <button type="button" class="ghost" id="addrow">+ Добавить ученика</button>
+      <div class="sum"><span>Итого за день</span><b id="daysum">0</b></div>
+      <button class="primary" type="submit">Сохранить день</button>
+    </form>
+  </div>
+
+  <div id="tab-stats" hidden>
+    <div class="grid2">
+      <label>С<input type="date" id="from"></label>
+      <label>По<input type="date" id="to"></label>
+    </div>
+    <label>Студия<select id="fs"></select></label>
+    <div class="total"><span id="totlbl">Заработано за период</span><b id="tot">0</b></div>
+    <div class="mute" id="meta"></div>
+    <div id="bystudio"></div>
+    <div id="bypupil"></div>
+    <div id="list"></div>
+    <details>
+      <summary>Резервная копия данных</summary>
+      <p>Данные хранятся только в этом телефоне. Если очистить данные Safari или удалить иконку, записи пропадут. Сохраняйте копию время от времени.</p>
+      <button class="sm" id="exp">Сохранить копию</button>
+      <label class="sm" style="margin-bottom:6px">Загрузить копию<input type="file" id="imp" accept=".json,application/json" hidden></label>
+    </details>
+  </div>
+</section>
+</main>
+<datalist id="studios"></datalist>
+<datalist id="pupils"></datalist>
+<div id="toast" role="status"></div>
+
+<script>
+const KEY='uchet-chasov-v1';
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+const fmt=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(n);
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const fdate=s=>s.split('-').reverse().join('.');
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let db=load();
+
+function load(){try{const j=JSON.parse(localStorage.getItem(KEY));return j&&Array.isArray(j.days)?j:{days:[]}}catch(e){return{days:[]}}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(db));return true}catch(e){toast('Не удалось сохранить. Проверьте, что Safari не в приватном режиме.');return false}}
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2600)}
+
+/* навигация */
+function go(id){$('#menu').hidden=id!=='menu';$('#hours').hidden=id!=='hours';window.scrollTo(0,0);if(id==='hours')refresh()}
+function tab(n){$$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===n));$('#tab-add').hidden=n!=='add';$('#tab-stats').hidden=n!=='stats';if(n==='stats')renderStats()}
+document.addEventListener('click',e=>{
+  const g=e.target.closest('[data-go]');if(g)go(g.dataset.go);
+  const t=e.target.closest('[data-tab]');if(t)tab(t.dataset.tab);
+});
+
+/* подсказки: студии и ученики */
+function refresh(){
+  const studios=[...new Set(db.days.map(d=>d.studio))].sort();
+  const pupils=[...new Set(db.days.flatMap(d=>d.students.map(s=>s.name)))].sort();
+  $('#studios').innerHTML=studios.map(s=>`<option value="${esc(s)}">`).join('');
+  $('#pupils').innerHTML=pupils.map(s=>`<option value="${esc(s)}">`).join('');
+  const cur=$('#fs').value;
+  $('#fs').innerHTML='<option value="">Все студии</option>'+studios.map(s=>`<option value="${esc(s)}"${s===cur?' selected':''}>${esc(s)}</option>`).join('');
+}
+
+/* форма дня */
+function addRow(){
+  const r=document.createElement('div');r.className='row';
+  r.innerHTML='<input class="n" list="pupils" placeholder="Имя ученика"><input class="p" inputmode="decimal" placeholder="Цена"><button type="button" class="x" aria-label="Убрать ученика">×</button>';
+  $('#rows').appendChild(r);return r;
+}
+function num(v){const n=parseFloat(String(v).replace(/\s/g,'').replace(',','.'));return n}
+function lastPrice(name,studio){
+  const k=name.trim().toLowerCase();
+  const ds=[...db.days].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  for(const pass of [1,2])for(const d of ds){if(pass===1&&d.studio!==studio)continue;
+    const s=d.students.find(x=>x.name.toLowerCase()===k);if(s)return s.price}
+  return '';
+}
+function daySum(){let t=0;$$('#rows .p').forEach(p=>{const n=num(p.value);if(n>0)t+=n});$('#daysum').textContent=fmt(t)}
+$('#addrow').onclick=()=>addRow().querySelector('.n').focus();
+$('#rows').addEventListener('click',e=>{if(e.target.closest('.x')){const rows=$$('#rows .row');if(rows.length>1)e.target.closest('.row').remove();else rows[0].querySelectorAll('input').forEach(i=>i.value='');daySum()}});
+$('#rows').addEventListener('input',e=>{if(e.target.classList.contains('p'))daySum()});
+$('#rows').addEventListener('change',e=>{
+  if(!e.target.classList.contains('n'))return;
+  const p=e.target.closest('.row').querySelector('.p');
+  if(!p.value&&e.target.value.trim()){const v=lastPrice(e.target.value,$('#studio').value.trim());if(v!=='')p.value=v;daySum()}
+});
+$('#f').addEventListener('submit',e=>{
+  e.preventDefault();
+  const studio=$('#studio').value.trim(),date=$('#date').value;
+  const students=[];
+  for(const r of $$('#rows .row')){
+    const name=r.querySelector('.n').value.trim(),raw=r.querySelector('.p').value.trim();
+    if(!name&&!raw)continue;
+    const price=num(raw);
+    if(!name||!(price>=0)){toast('Заполните имя и цену у каждого ученика');return}
+    students.push({name,price});
+  }
+  if(!studio||!date||!students.length){toast('Нужны студия, дата и хотя бы один ученик');return}
+  db.days.push({id:Date.now(),studio,date,students});
+  if(!save()){db.days.pop();return}
+  $('#rows').innerHTML='';addRow();daySum();refresh();
+  toast('День сохранён');
+});
+
+/* статистика */
+function renderStats(){
+  const f=$('#from').value,t=$('#to').value,s=$('#fs').value;
+  const ds=db.days.filter(d=>(!f||d.date>=f)&&(!t||d.date<=t)&&(!s||d.studio===s)).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  let tot=0,cnt=0;const st={},pu={};
+  ds.forEach(d=>d.students.forEach(x=>{
+    tot+=x.price;cnt++;
+    (st[d.studio]=st[d.studio]||{n:0,s:0}).n++;st[d.studio].s+=x.price;
+    (pu[x.name]=pu[x.name]||{n:0,s:0}).n++;pu[x.name].s+=x.price;
+  }));
+  $('#totlbl').textContent=s?'Заработано в студии «'+s+'»':'Заработано за период';
+  $('#tot').textContent=fmt(tot);
+  $('#meta').textContent=ds.length?`Рабочих дней: ${ds.length} · занятий с учениками: ${cnt}`:'За этот период записей нет. Измените даты или студию.';
+  const tbl=(title,o)=>{const k=Object.keys(o).sort((a,b)=>o[b].s-o[a].s);return k.length?`<h2>${title}</h2>`+k.map(n=>`<div class="tr"><span>${esc(n)} <span class="mute">× ${o[n].n}</span></span><span>${fmt(o[n].s)}</span></div>`).join(''):''};
+  $('#bystudio').innerHTML=s?'':(Object.keys(st).length>1?tbl('По студиям',st):'');
+  $('#bypupil').innerHTML=tbl('По ученикам',pu);
+  $('#list').innerHTML=ds.length?'<h2>Все дни</h2>'+ds.map(d=>`<article class="day"><div class="dh"><span><b>${fdate(d.date)}</b> · ${esc(d.studio)}</span><b>${fmt(d.students.reduce((a,x)=>a+x.price,0))}</b></div><div class="mute">${d.students.map(x=>esc(x.name)+' '+fmt(x.price)).join(', ')}</div><button class="del" data-del="${d.id}">Удалить день</button></article>`).join(''):'';
+}
+['#from','#to','#fs'].forEach(i=>$(i).addEventListener('change',renderStats));
+$('#list').addEventListener('click',e=>{
+  const b=e.target.closest('[data-del]');if(!b)return;
+  if(!confirm('Удалить этот день?'))return;
+  db.days=db.days.filter(d=>String(d.id)!==b.dataset.del);save();refresh();renderStats();toast('День удалён');
+});
+
+/* резервная копия */
+$('#exp').onclick=async()=>{
+  const name='uchet-chasov-'+iso(new Date())+'.json';
+  const file=new File([JSON.stringify(db)],name,{type:'application/json'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return}catch(e){if(e.name==='AbortError')return}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;a.click();
+};
+$('#imp').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const j=JSON.parse(await f.text());if(!Array.isArray(j.days))throw 0;
+    if(!confirm(`Заменить текущие данные (дней: ${db.days.length}) данными из копии (дней: ${j.days.length})?`)){e.target.value='';return}
+    db=j;save();refresh();renderStats();toast('Копия загружена');
+  }catch(x){toast('Файл не похож на копию данных')}
+  e.target.value='';
+};
+
+/* старт */
+const now=new Date();
+$('#date').value=iso(now);
+$('#to').value=iso(now);
+$('#from').value=iso(new Date(now.getFullYear(),now.getMonth(),1));
+addRow();refresh();
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));
+</script>
+</body>
+</html>
