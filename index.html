@@ -59,6 +59,10 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
 .sm{display:inline-block;padding:10px 14px;margin:0 8px 6px 0;border:1px solid var(--acc);border-radius:10px;color:var(--acc);font-size:16px}
 #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:90%;padding:12px 18px;border-radius:12px;background:var(--ink);color:var(--bg);font-size:15px;opacity:0;pointer-events:none;transition:opacity .2s}
 #toast.on{opacity:1}
+#md{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center}
+#sheet{width:100%;max-width:640px;max-height:88vh;overflow:auto;background:var(--bg);border-radius:18px 18px 0 0;padding:6px 16px calc(18px + env(safe-area-inset-bottom))}
+.err{color:var(--bad);font-size:14px;min-height:20px}
+.lockbtn{margin-left:auto;color:var(--mute);font-size:15px;padding:8px 0}
 [hidden]{display:none!important}
 @media(prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
@@ -68,10 +72,11 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
 <section id="menu">
   <h1>Главное меню</h1>
   <button class="tile" data-go="hours"><b>Учет часов</b><span>Занятия, студии и заработок за период</span></button>
+  <button class="tile" data-go="crm" style="margin-top:12px"><b>CRM</b><span>Карточки знакомых</span></button>
 </section>
 
 <section id="hours" hidden>
-  <div class="bar"><button class="back" data-go="menu">‹ Меню</button></div>
+  <div class="bar"><button class="back" data-go="menu">‹ Меню</button><button class="lockbtn" data-lock="hours">Пароль</button></div>
   <h1>Учет часов</h1>
   <nav class="tabs"><button data-tab="add" class="on">Добавить день</button><button data-tab="stats">Статистика</button></nav>
 
@@ -83,7 +88,8 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
       <div id="rows"></div>
       <button type="button" class="ghost" id="addrow">+ Добавить ученика</button>
       <div class="sum"><span>Итого за день</span><b id="daysum">0</b></div>
-      <button class="primary" type="submit">Сохранить день</button>
+      <button class="primary" type="submit" id="sub">Сохранить день</button>
+      <button type="button" class="ghost" id="cancel" hidden>Отменить изменение</button>
     </form>
   </div>
 
@@ -106,7 +112,13 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
     </details>
   </div>
 </section>
+<section id="crm" hidden>
+  <div class="bar"><button class="back" data-go="menu">‹ Меню</button><button class="lockbtn" data-lock="crm">Пароль</button></div>
+  <h1>CRM</h1>
+  <div id="crmbody"></div>
+</section>
 </main>
+<div id="md" hidden><div id="sheet"></div></div>
 <datalist id="studios"></datalist>
 <datalist id="pupils"></datalist>
 <div id="toast" role="status"></div>
@@ -126,12 +138,55 @@ function load(){try{const j=JSON.parse(localStorage.getItem(KEY));return j&&Arra
 function save(){try{localStorage.setItem(KEY,JSON.stringify(db));return true}catch(e){toast('Не удалось сохранить. Проверьте, что Safari не в приватном режиме.');return false}}
 let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2600)}
 
+/* окно-шторка */
+function openSheet(h){$('#md').hidden=false;$('#sheet').innerHTML=h;document.body.style.overflow='hidden'}
+function closeSheet(){const s=$('#sheet');s.onclick=s.onchange=null;$('#md').hidden=true;s.innerHTML='';document.body.style.overflow=''}
+
+/* пароли разделов */
+const LK='locks-v1';let locks={};try{locks=JSON.parse(localStorage.getItem(LK))||{}}catch(e){}
+const unlocked=new Set(),enc=new TextEncoder();
+async function hp(pw,salt){const k=await crypto.subtle.importKey('raw',enc.encode(pw),'PBKDF2',false,['deriveBits']);const b=await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode(salt),iterations:150000,hash:'SHA-256'},k,256);return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+function askPw(sec){return new Promise(res=>{
+  openSheet('<h2>Введите пароль</h2><input id="pw" type="password" placeholder="Пароль"><div class="err" id="pe"></div><button class="primary" id="pok">Открыть</button><button class="ghost" id="pno">Отмена</button>');
+  const ok=async()=>{if(await hp($('#pw').value,locks[sec].s)===locks[sec].h){unlocked.add(sec);closeSheet();res(true)}else{$('#pe').textContent='Неверный пароль';$('#pw').value=''}};
+  $('#pok').onclick=ok;$('#pw').onkeydown=e=>{if(e.key==='Enter')ok()};$('#pno').onclick=()=>{closeSheet();res(false)};$('#pw').focus();
+})}
+function lockSheet(sec){
+  const has=!!locks[sec];
+  openSheet(`<h2>Пароль для раздела</h2>${has?'<label>Текущий пароль<input id="op" type="password"></label>':''}<label>${has?'Новый пароль (пусто — снять защиту)':'Новый пароль'}<input id="np" type="password"></label><div class="err" id="pe"></div><p class="mute">Забытый пароль восстановить нельзя: останется только очистить данные сайта, и записи пропадут. Пароль защищает от случайного взгляда, сами данные не шифруются.</p><button class="primary" id="pok">Сохранить</button><button class="ghost" id="pno">Закрыть</button>`);
+  $('#pno').onclick=closeSheet;
+  $('#pok').onclick=async()=>{
+    if(has&&await hp($('#op').value,locks[sec].s)!==locks[sec].h){$('#pe').textContent='Текущий пароль неверный';return}
+    const n=$('#np').value;
+    if(!n){delete locks[sec];unlocked.delete(sec)}else{const s=crypto.randomUUID();locks[sec]={s,h:await hp(n,s)};unlocked.add(sec)}
+    localStorage.setItem(LK,JSON.stringify(locks));closeSheet();toast(n?'Пароль установлен':'Защита снята');
+  };
+}
+
 /* навигация */
-function go(id){$('#menu').hidden=id!=='menu';$('#hours').hidden=id!=='hours';window.scrollTo(0,0);if(id==='hours')refresh()}
+async function go(id){
+  if(id!=='menu'&&locks[id]&&!unlocked.has(id)&&!await askPw(id))return;
+  $('#menu').hidden=id!=='menu';$('#hours').hidden=id!=='hours';$('#crm').hidden=id!=='crm';
+  window.scrollTo(0,0);if(id==='hours')refresh();if(id==='crm'&&window.crmShow)crmShow();
+}
+
+/* правка дня */
+let editing=null;
+function resetForm(){const was=editing;editing=null;$('#rows').innerHTML='';addRow();daySum();$('#sub').textContent='Сохранить день';$('#cancel').hidden=true;if(was){$('#studio').value='';$('#date').value=iso(new Date())}}
+function editDay(id){
+  const d=db.days.find(x=>x.id===id);if(!d)return;
+  resetForm();editing=id;$('#rows').innerHTML='';
+  $('#studio').value=d.studio;$('#date').value=d.date;
+  d.students.forEach(s=>{const r=addRow();r.querySelector('.n').value=s.name;r.querySelector('.p').value=s.price});
+  daySum();$('#sub').textContent='Сохранить изменения';$('#cancel').hidden=false;tab('add');window.scrollTo(0,0);
+}
+$('#cancel').onclick=()=>{resetForm();tab('stats')};
 function tab(n){$$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===n));$('#tab-add').hidden=n!=='add';$('#tab-stats').hidden=n!=='stats';if(n==='stats')renderStats()}
 document.addEventListener('click',e=>{
   const g=e.target.closest('[data-go]');if(g)go(g.dataset.go);
   const t=e.target.closest('[data-tab]');if(t)tab(t.dataset.tab);
+  const l=e.target.closest('[data-lock]');if(l)lockSheet(l.dataset.lock);
+  const ed=e.target.closest('[data-edit]');if(ed)editDay(+ed.dataset.edit);
 });
 
 /* подсказки: студии и ученики */
@@ -179,10 +234,13 @@ $('#f').addEventListener('submit',e=>{
     students.push({name,price});
   }
   if(!studio||!date||!students.length){toast('Нужны студия, дата и хотя бы один ученик');return}
-  db.days.push({id:Date.now(),studio,date,students});
-  if(!save()){db.days.pop();return}
-  $('#rows').innerHTML='';addRow();daySum();refresh();
-  toast('День сохранён');
+  const old=db.days.slice(),was=editing;
+  if(was){const i=db.days.findIndex(d=>d.id===was);db.days[i]={id:was,studio,date,students}}
+  else db.days.push({id:Date.now(),studio,date,students});
+  if(!save()){db.days=old;return}
+  resetForm();refresh();
+  toast(was?'Изменения сохранены':'День сохранён');
+  if(was)tab('stats');
 });
 
 /* статистика */
@@ -201,7 +259,7 @@ function renderStats(){
   const tbl=(title,o)=>{const k=Object.keys(o).sort((a,b)=>o[b].s-o[a].s);return k.length?`<h2>${title}</h2>`+k.map(n=>`<div class="tr"><span>${esc(n)} <span class="mute">× ${o[n].n}</span></span><span>${fmt(o[n].s)}</span></div>`).join(''):''};
   $('#bystudio').innerHTML=s?'':(Object.keys(st).length>1?tbl('По студиям',st):'');
   $('#bypupil').innerHTML=tbl('По ученикам',pu);
-  $('#list').innerHTML=ds.length?'<h2>Все дни</h2>'+ds.map(d=>`<article class="day"><div class="dh"><span><b>${fdate(d.date)}</b> · ${esc(d.studio)}</span><b>${fmt(d.students.reduce((a,x)=>a+x.price,0))}</b></div><div class="mute">${d.students.map(x=>esc(x.name)+' '+fmt(x.price)).join(', ')}</div><button class="del" data-del="${d.id}">Удалить день</button></article>`).join(''):'';
+  $('#list').innerHTML=ds.length?'<h2>Все дни</h2>'+ds.map(d=>`<article class="day"><div class="dh"><span><b>${fdate(d.date)}</b> · ${esc(d.studio)}</span><b>${fmt(d.students.reduce((a,x)=>a+x.price,0))}</b></div><div class="mute">${d.students.map(x=>esc(x.name)+' '+fmt(x.price)).join(', ')}</div><button class="del" style="color:var(--acc);margin-right:18px" data-edit="${d.id}">Изменить</button><button class="del" data-del="${d.id}">Удалить день</button></article>`).join(''):'';
 }
 ['#from','#to','#fs'].forEach(i=>$(i).addEventListener('change',renderStats));
 $('#list').addEventListener('click',e=>{
@@ -213,7 +271,7 @@ $('#list').addEventListener('click',e=>{
 /* резервная копия */
 $('#exp').onclick=async()=>{
   const name='uchet-chasov-'+iso(new Date())+'.json';
-  const file=new File([JSON.stringify(db)],name,{type:'application/json'});
+  const file=new File([JSON.stringify({...db,crm:window.crmGet&&crmGet()})],name,{type:'application/json'});
   if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return}catch(e){if(e.name==='AbortError')return}}
   const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;a.click();
 };
@@ -222,7 +280,7 @@ $('#imp').onchange=async e=>{
   try{
     const j=JSON.parse(await f.text());if(!Array.isArray(j.days))throw 0;
     if(!confirm(`Заменить текущие данные (дней: ${db.days.length}) данными из копии (дней: ${j.days.length})?`)){e.target.value='';return}
-    db=j;save();refresh();renderStats();toast('Копия загружена');
+    db={days:j.days};save();if(j.crm&&window.crmSet)crmSet(j.crm);refresh();renderStats();toast('Копия загружена');
   }catch(x){toast('Файл не похож на копию данных')}
   e.target.value='';
 };
@@ -236,5 +294,6 @@ addRow();refresh();
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));
 </script>
+<script src="crm.js"></script>
 </body>
 </html>
