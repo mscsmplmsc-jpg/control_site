@@ -63,6 +63,9 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
 #sheet{width:100%;max-width:640px;max-height:88vh;overflow:auto;background:var(--bg);border-radius:18px 18px 0 0;padding:6px 16px calc(18px + env(safe-area-inset-bottom))}
 .err{color:var(--bad);font-size:14px;min-height:20px}
 .lockbtn{margin-left:auto;color:var(--mute);font-size:15px;padding:8px 0}
+.lockbtn+.lockbtn{margin-left:14px}
+.ft{margin-top:44px;text-align:center;font-size:13px;color:var(--mute)}
+.ft a{color:var(--acc)}
 [hidden]{display:none!important}
 @media(prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
@@ -73,6 +76,7 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
   <h1>Главное меню</h1>
   <button class="tile" data-go="hours"><b>Учет часов</b><span>Занятия, студии и заработок за период</span></button>
   <button class="tile" data-go="crm" style="margin-top:12px"><b>CRM</b><span>Карточки знакомых</span></button>
+  <button class="tile" data-go="rem" style="margin-top:12px"><b>Напоминания</b><span>С уведомлением через Календарь iPhone</span></button>
 </section>
 
 <section id="hours" hidden>
@@ -113,10 +117,16 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
   </div>
 </section>
 <section id="crm" hidden>
-  <div class="bar"><button class="back" data-go="menu">‹ Меню</button><button class="lockbtn" data-lock="crm">Пароль</button></div>
+  <div class="bar"><button class="back" data-go="menu">‹ Меню</button><button class="lockbtn" data-help="crm">Инструкция</button><button class="lockbtn" data-lock="crm">Пароль</button></div>
   <h1>CRM</h1>
   <div id="crmbody"></div>
 </section>
+<section id="rem" hidden>
+  <div class="bar"><button class="back" data-go="menu">‹ Меню</button><button class="lockbtn" data-lock="rem">Пароль</button></div>
+  <h1>Напоминания</h1>
+  <div id="rembody"></div>
+</section>
+<footer class="ft">made by: <a href="https://vk.ru/ferretartem" target="_blank" rel="noopener noreferrer">ArtemoWitch</a></footer>
 </main>
 <div id="md" hidden><div id="sheet"></div></div>
 <datalist id="studios"></datalist>
@@ -166,8 +176,8 @@ function lockSheet(sec){
 /* навигация */
 async function go(id){
   if(id!=='menu'&&locks[id]&&!unlocked.has(id)&&!await askPw(id))return;
-  $('#menu').hidden=id!=='menu';$('#hours').hidden=id!=='hours';$('#crm').hidden=id!=='crm';
-  window.scrollTo(0,0);if(id==='hours')refresh();if(id==='crm'&&window.crmShow)crmShow();
+  $('#menu').hidden=id!=='menu';$('#hours').hidden=id!=='hours';$('#crm').hidden=id!=='crm';$('#rem').hidden=id!=='rem';
+  window.scrollTo(0,0);if(id==='hours')refresh();if(id==='crm'&&window.crmShow)crmShow();if(id==='rem'&&window.remShow)remShow();
 }
 
 /* правка дня */
@@ -271,7 +281,7 @@ $('#list').addEventListener('click',e=>{
 /* резервная копия */
 $('#exp').onclick=async()=>{
   const name='uchet-chasov-'+iso(new Date())+'.json';
-  const file=new File([JSON.stringify({...db,crm:window.crmGet&&crmGet()})],name,{type:'application/json'});
+  const file=new File([JSON.stringify({...db,crm:window.crmGet&&crmGet(),rem:window.remGet&&remGet()})],name,{type:'application/json'});
   if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return}catch(e){if(e.name==='AbortError')return}}
   const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;a.click();
 };
@@ -280,7 +290,7 @@ $('#imp').onchange=async e=>{
   try{
     const j=JSON.parse(await f.text());if(!Array.isArray(j.days))throw 0;
     if(!confirm(`Заменить текущие данные (дней: ${db.days.length}) данными из копии (дней: ${j.days.length})?`)){e.target.value='';return}
-    db={days:j.days};save();if(j.crm&&window.crmSet)crmSet(j.crm);refresh();renderStats();toast('Копия загружена');
+    db={days:j.days};save();if(j.crm&&window.crmSet)crmSet(j.crm);if(j.rem&&window.remSet)remSet(j.rem);refresh();renderStats();toast('Копия загружена');
   }catch(x){toast('Файл не похож на копию данных')}
   e.target.value='';
 };
@@ -295,5 +305,6 @@ if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));
 </script>
 <script src="crm.js"></script>
+<script src="reminders.js"></script>
 </body>
 </html>

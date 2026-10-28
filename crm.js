@@ -24,6 +24,7 @@ st.textContent=`
 .pl{position:absolute;right:6px;bottom:4px;color:#fff;font-size:14px;text-shadow:0 0 4px #000}
 .big.m{width:100%;max-height:68vh;object-fit:contain;border-radius:10px;background:#000}
 .up{cursor:pointer}
+#sheet ul{padding-left:20px;margin:6px 0}#sheet li{margin:5px 0}
 `;
 document.head.appendChild(st);
 
@@ -52,6 +53,8 @@ async function share(blob,name,type,u){
   const a=document.createElement('a');a.href=u;a.download=name;a.click();
 }
 
+window.mdb={mPut,mGet,mDel,url,share,uid};
+
 /* отображение */
 const rank=p=>p.sex?(p.ended?3:1):p.friend?4:p.ended?5:2;
 const byName=(a,b)=>a.name.localeCompare(b.name,'ru');
@@ -66,7 +69,7 @@ function mini(p,flags,gap){
 }
 function vList(){
   const ps=[...C.people].sort((a,b)=>rank(a)-rank(b)||byName(a,b));
-  let h='<button class="primary" data-a="new">+ Новая карточка</button>',last=0;
+  let h='<button class="primary" data-a="new">+ Новая карточка</button>'+(ps.length?'<button class="ghost" data-a="exptxt">Выгрузить все карточки в текст</button>':''),last=0;
   if(!ps.length)h+='<p class="mute">Карточек пока нет. Создайте первую.</p>';
   ps.forEach(p=>{const r=rank(p);h+=mini(p,true,last&&r!==last);last=r});
   return h;
@@ -178,6 +181,60 @@ async function viewer(p,mid){
   };
 }
 
+function exportText(){
+  if(!C.people.length){toast('Карточек пока нет');return}
+  const ps=[...C.people].sort((a,b)=>rank(a)-rank(b)||byName(a,b));
+  const out=['CRM — выгрузка от '+fdate(iso(new Date())),'Карточек: '+ps.length,''];
+  ps.forEach(p=>{
+    out.push('==============================',p.name,'==============================');
+    const add=(k,x)=>{if(x&&String(x).trim())out.push(k+': '+String(x).trim())};
+    const blk=(k,x)=>{if(x&&x.trim())out.push('',k+':',x.trim())};
+    add('Когда познакомились',p.metWhen);add('Где познакомились',p.metWhere);add('День рождения',p.bday&&fdate(p.bday));add('Телефон',p.phone);
+    blk('Соцсети',p.socials);blk('Личная информация',p.bio);blk('Ключевые воспоминания',p.memories);blk('Совместные планы',p.plans);
+    if(p.meets.length){out.push('','История встреч:');[...p.meets].sort((a,b)=>a.date.localeCompare(b.date)).forEach(m=>out.push('  '+fdate(m.date)+' — '+m.text.replace(/\n/g,'\n    ')))}
+    const ln=p.links.map(P).filter(Boolean).map(q=>q.name);if(ln.length)out.push('','Общий круг: '+ln.join(', '));
+    const fl=[p.sex&&'был секс',p.ended&&'общение закончено',p.friend&&'её друг'].filter(Boolean);
+    if(fl.length)out.push('','Отметки: '+fl.join(', '));
+    if(p.sex)blk('Заметки о сексе',p.sexNotes);
+    if(p.ended)blk('Причина',p.reason);
+    if(p.media.length)out.push('','Медиафайлов в приложении: '+p.media.length+' (в выгрузку не входят)');
+    out.push('','');
+  });
+  const blob=new Blob([out.join('\n')],{type:'text/plain'});
+  share(blob,'crm-'+iso(new Date())+'.txt','text/plain',URL.createObjectURL(blob));
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('[data-help="crm"]'))return;
+  openSheet(`<h2>Инструкция по CRM</h2>
+<p class="mute">Здесь хранятся карточки знакомых, чтобы ничего о людях не забывать. Всё лежит только в этом телефоне.</p>
+<h2>Создать карточку</h2>
+<ul><li>Нажмите «+ Новая карточка». Обязательно только имя, остальное заполняйте по желанию.</li>
+<li>Поля: фото, когда и где познакомились, день рождения, телефон, соцсети (по одной ссылке в строке), личная информация, ключевые воспоминания, совместные планы.</li>
+<li>Фото копируется в приложение, поэтому его можно спокойно удалить из галереи телефона.</li></ul>
+<h2>Список</h2>
+<ul><li>В списке видны фото, имя, где и когда познакомились, день рождения, телефон и отметки. Нажмите на карточку, чтобы открыть всю информацию.</li>
+<li>Порядок групп сверху вниз: «был секс»; без отметок; «был секс» и «общение закончено»; «её друг»; только «общение закончено». Между группами увеличенный отступ. Внутри группы по алфавиту.</li></ul>
+<h2>Внутри карточки</h2>
+<ul><li><b>Изменить</b>: правка всех полей, фото и удаление карточки.</li>
+<li><b>Последняя встреча</b>: виджет показывает дату и заметку последней встречи. Нажмите на него, чтобы увидеть всю историю, добавить встречу (дата и текст) или удалить ненужную.</li>
+<li><b>Общий круг</b>: «+ Связать с карточкой» связывает людей с общими знакомыми. Связь двусторонняя: она появится в обеих карточках. Нажмите на виджет связанного человека, чтобы перейти к его карточке.</li>
+<li><b>Отметки</b>: «был секс», «общение закончено», «её друг». Поставить и снять «был секс» можно только после подтверждения. Пока заполнены «Заметки о сексе», отметку снять нельзя: сначала очистите заметки. У «общение закончено» появляется поле «Причина».</li>
+<li>Текстовые поля отметок сохраняются автоматически, когда вы выходите из поля.</li></ul>
+<h2>Медиа</h2>
+<ul><li>Кнопка «Медиа» открывает галерею человека. «+ Добавить» загружает фото и видео, можно выбрать сразу несколько.</li>
+<li>Файлы копируются в приложение и остаются, даже если вы удалите их из галереи телефона. Смотреть их можно прямо здесь.</li>
+<li>Нажмите на файл: «Скачать» откроет меню iPhone, где можно сохранить его в «Фото» или «Файлы». «Удалить» убирает файл только из приложения.</li></ul>
+<h2>Выгрузка в текст</h2>
+<ul><li>«Выгрузить все карточки в текст» внизу под кнопкой создания собирает все заполненные поля всех карточек в один читаемый файл .txt. Фото и видео в него не входят.</li>
+<li>Готовый файл не защищён паролем. Храните и отправляйте его осторожно.</li></ul>
+<h2>Пароль и сохранность</h2>
+<ul><li>«Пароль» вверху экрана ставит, меняет или снимает пароль на раздел. Забытый пароль восстановить нельзя.</li>
+<li>Пароль спросят снова после полного закрытия приложения.</li>
+<li>Резервная копия в разделе «Учет часов» (Статистика → «Резервная копия данных») сохраняет и текст CRM, но не фото и видео. Если очистить данные Safari или удалить иконку, медиа пропадут безвозвратно.</li></ul>
+<button class="ghost" id="hx">Закрыть</button>`);
+  $('#hx').onclick=closeSheet;
+});
+
 const body=$('#crmbody');
 body.addEventListener('click',e=>{
   const b=e.target.closest('[data-a]');if(!b)return;
@@ -192,6 +249,7 @@ body.addEventListener('click',e=>{
   else if(a==='view')viewer(p,id);
   else if(a==='save')saveForm(v.id);
   else if(a==='del')delPerson(v.id);
+  else if(a==='exptxt')exportText();
   else if(a==='rmph'){draft.rm=true;draft.blob=null;$('#ph_prev').innerHTML='<span class="av big">?</span>';b.hidden=true}
 });
 body.addEventListener('change',async e=>{
