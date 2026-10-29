@@ -76,7 +76,8 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
   <h1>Главное меню</h1>
   <button class="tile" data-go="hours"><b>Учет часов</b><span>Занятия, студии и заработок за период</span></button>
   <button class="tile" data-go="crm" style="margin-top:12px"><b>CRM</b><span>Карточки знакомых</span></button>
-  <button class="tile" data-go="rem" style="margin-top:12px"><b>Напоминания</b><span>С уведомлением через Календарь iPhone</span></button>
+  <button class="tile" data-go="rem" style="margin-top:12px"><b>Напоминания</b><span>Уведомления в нужное время</span></button>
+  <button class="tile" data-go="tsk" style="margin-top:12px"><b>Список задач</b><span>Проекты, подзадачи, сроки и приоритеты</span></button>
 </section>
 
 <section id="hours" hidden>
@@ -125,6 +126,11 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
   <div class="bar"><button class="back" data-go="menu">‹ Меню</button><button class="lockbtn" data-lock="rem">Пароль</button></div>
   <h1>Напоминания</h1>
   <div id="rembody"></div>
+</section>
+<section id="tsk" hidden>
+  <div class="bar"><button class="back" data-go="menu">‹ Меню</button><button class="lockbtn" data-tmap="1">Карта маркировки</button><button class="lockbtn" data-lock="tsk">Пароль</button></div>
+  <h1>Список задач</h1>
+  <div id="tskbody"></div>
 </section>
 <footer class="ft">made by: <a href="https://vk.ru/ferretartem" target="_blank" rel="noopener noreferrer">ArtemoWitch</a></footer>
 </main>
@@ -176,8 +182,8 @@ function lockSheet(sec){
 /* навигация */
 async function go(id){
   if(id!=='menu'&&locks[id]&&!unlocked.has(id)&&!await askPw(id))return;
-  $('#menu').hidden=id!=='menu';$('#hours').hidden=id!=='hours';$('#crm').hidden=id!=='crm';$('#rem').hidden=id!=='rem';
-  window.scrollTo(0,0);if(id==='hours')refresh();if(id==='crm'&&window.crmShow)crmShow();if(id==='rem'&&window.remShow)remShow();
+  $('#menu').hidden=id!=='menu';$('#hours').hidden=id!=='hours';$('#crm').hidden=id!=='crm';$('#rem').hidden=id!=='rem';$('#tsk').hidden=id!=='tsk';
+  window.scrollTo(0,0);if(id==='hours')refresh();if(id==='crm'&&window.crmShow)crmShow();if(id==='rem'&&window.remShow)remShow();if(id==='tsk'&&window.tskShow)tskShow();
 }
 
 /* правка дня */
@@ -281,7 +287,7 @@ $('#list').addEventListener('click',e=>{
 /* резервная копия */
 $('#exp').onclick=async()=>{
   const name='uchet-chasov-'+iso(new Date())+'.json';
-  const file=new File([JSON.stringify({...db,crm:window.crmGet&&crmGet(),rem:window.remGet&&remGet()})],name,{type:'application/json'});
+  const file=new File([JSON.stringify({...db,crm:window.crmGet&&crmGet(),rem:window.remGet&&remGet(),tsk:window.tskGet&&tskGet()})],name,{type:'application/json'});
   if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return}catch(e){if(e.name==='AbortError')return}}
   const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;a.click();
 };
@@ -290,7 +296,7 @@ $('#imp').onchange=async e=>{
   try{
     const j=JSON.parse(await f.text());if(!Array.isArray(j.days))throw 0;
     if(!confirm(`Заменить текущие данные (дней: ${db.days.length}) данными из копии (дней: ${j.days.length})?`)){e.target.value='';return}
-    db={days:j.days};save();if(j.crm&&window.crmSet)crmSet(j.crm);if(j.rem&&window.remSet)remSet(j.rem);refresh();renderStats();toast('Копия загружена');
+    db={days:j.days};save();if(j.crm&&window.crmSet)crmSet(j.crm);if(j.rem&&window.remSet)remSet(j.rem);if(j.tsk&&window.tskSet)tskSet(j.tsk);refresh();renderStats();toast('Копия загружена');
   }catch(x){toast('Файл не похож на копию данных')}
   e.target.value='';
 };
@@ -306,5 +312,6 @@ if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWor
 </script>
 <script src="crm.js"></script>
 <script src="reminders.js"></script>
+<script src="tasks.js"></script>
 </body>
 </html>
