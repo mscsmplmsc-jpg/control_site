@@ -21,13 +21,70 @@ const by=r=>r.when;
 async function hy(root){for(const el of root.querySelectorAll('[data-m]')){const u=await mdb.url(el.dataset.m);if(u)el.src=u+(el.tagName==='VIDEO'?'#t=0.1':'')}}
 const thumb=m=>`<button class="th" data-mv="${m.id}">${m.kind==='video'?`<video data-m="${m.id}" preload="metadata" muted playsinline></video><span class="pl">▶</span>`:`<img data-m="${m.id}" alt="">`}</button>`;
 
+/* push-уведомления через свой сервер на Cloudflare */
+const VAPID_PUB='BHzrb5Enj9P6Yn6N3z26E2t8IsqB8fUzLstt_IxIuETdRhtCEHGmJy1rARsgZsDOB6cQ5ZQCcuUiyiohDApAUAM';
+const PC='push-cfg-v1';
+let cfg={};try{cfg=JSON.parse(localStorage.getItem(PC))||{}}catch(e){}
+const getSub=()=>{try{return JSON.parse(localStorage.getItem('push-sub'))}catch(e){return null}};
+const pushOk=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+const standalone=()=>navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
+const unb64u=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return Uint8Array.from(atob(s),c=>c.charCodeAt(0))};
+async function api(o){const r=await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({t:cfg.token,...o})});return r.json()}
+const pushOn=()=>!!(cfg.url&&cfg.token&&getSub()&&pushOk()&&Notification.permission==='granted');
+const pushShort=()=>pushOn()?'включены':'не настроены';
+function pushStatus(){
+  if(!pushOk())return 'Этот браузер не поддерживает push-уведомления.';
+  if(!standalone())return 'Откройте приложение с иконки на экране «Домой»: в обычном Safari уведомления на iPhone не работают.';
+  if(Notification.permission==='denied')return 'Уведомления запрещены. Разрешите их в Настройки iPhone → Уведомления → Мои часы.';
+  return pushOn()?'Уведомления включены.':'Уведомления ещё не включены.';
+}
+async function sync(r){
+  if(!pushOn()){r.push='off';return}
+  const at=new Date(r.when).getTime();
+  if(at<=Date.now()){r.push='past';return}
+  try{const j=await api({op:'add',id:r.id,sub:getSub(),title:'Напоминание',body:r.text,at});r.push=j.ok?'ok':'err'}catch(e){r.push='err'}
+}
+async function unsync(r){if(r.push==='ok'&&cfg.url){try{await api({op:'del',id:r.id})}catch(e){}}}
+function pushSheet(){
+  openSheet(`<h2>Уведомления</h2><p class="mute" id="p_st">${esc(pushStatus())}</p>
+  <label>Адрес сервера (Worker)<input id="p_u" value="${esc(cfg.url||'')}" placeholder="https://имя.аккаунт.workers.dev" autocapitalize="off" autocorrect="off"></label>
+  <label>Секретный код<input id="p_t" type="password" value="${esc(cfg.token||'')}" autocapitalize="off" autocorrect="off"></label>
+  <button class="primary" id="p_on">Сохранить и включить</button>
+  <button class="ghost" id="p_test">Отправить тестовое уведомление</button>
+  <div class="mute" id="p_msg"></div>
+  <button class="ghost" id="p_x">Закрыть</button>`);
+  const msg=t=>{$('#p_msg').textContent=t};
+  const store=()=>{cfg={url:$('#p_u').value.trim(),token:$('#p_t').value.trim()};localStorage.setItem(PC,JSON.stringify(cfg))};
+  $('#p_x').onclick=()=>{closeSheet();show()};
+  $('#p_on').onclick=async()=>{
+    store();
+    if(!cfg.url||!cfg.token){msg('Заполните адрес сервера и секретный код.');return}
+    if(!pushOk()||!standalone()){msg(pushStatus());return}
+    try{
+      if(await Notification.requestPermission()!=='granted'){msg(pushStatus());return}
+      const reg=await navigator.serviceWorker.ready;
+      let s=await reg.pushManager.getSubscription();
+      if(!s)s=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:unb64u(VAPID_PUB)});
+      localStorage.setItem('push-sub',JSON.stringify(s));
+      $('#p_st').textContent=pushStatus();msg('Готово. Нажмите «Отправить тестовое уведомление».');
+    }catch(e){msg('Ошибка: '+(e&&e.message||e))}
+  };
+  $('#p_test').onclick=async()=>{
+    store();
+    if(!getSub()){msg('Сначала нажмите «Сохранить и включить».');return}
+    msg('Отправляю…');
+    try{const j=await api({op:'test',sub:getSub()});msg(j.ok?'Отправлено. Уведомление придёт через несколько секунд.':'Сервер ответил: '+(j.error||j.status)+' '+(j.detail||''))}
+    catch(e){msg('Не удалось связаться с сервером, проверьте адрес. ('+(e&&e.message||e)+')')}
+  };
+}
+
 let v='list',draft={files:[]};
 
 function vList(){
   const up=R.items.filter(r=>!past(r)).sort((a,b)=>by(a).localeCompare(by(b)));
   const ps=R.items.filter(past).sort((a,b)=>by(b).localeCompare(by(a)));
   const it=r=>`<div class="ri${past(r)?' past':''}" data-id="${r.id}"><b>${esc(when(r.when))}</b>${r.media.length?`<span class="tag">файлов: ${r.media.length}</span>`:''}<div class="clip">${esc(r.text)}</div><button class="del" data-del="${r.id}">Удалить</button></div>`;
-  return '<button class="primary" data-a="new">+ Новое напоминание</button>'
+  return '<button class="primary" data-a="new">+ Новое напоминание</button><button class="ghost" data-a="push">Уведомления: '+pushShort()+'</button>'
     +(up.length?'<h2>Предстоящие</h2>'+up.map(it).join(''):'')
     +(ps.length?'<h2>История</h2>'+ps.map(it).join('')+'<button class="ghost" data-a="clr">Очистить историю</button>':'')
     +(R.items.length?'':'<p class="mute">Напоминаний пока нет.</p>');
@@ -39,7 +96,7 @@ function vNew(){
   <label class="sm up">+ Прикрепить фото и видео<input type="file" id="r_f" accept="image/*,video/*" multiple hidden></label>
   <div id="r_fl" class="mute" style="margin-bottom:12px"></div>
   <button class="primary" data-a="save">Сохранить</button>
-  <p class="mute">Чтобы пришло уведомление, после сохранения добавьте напоминание в Календарь iPhone.</p>`;
+  <p class="mute">Уведомление придёт от приложения в указанное время. Его нужно один раз настроить кнопкой «Уведомления» в списке.</p>`;
 }
 function flist(){
   const el=$('#r_fl');if(!el)return;
@@ -54,7 +111,7 @@ function show(){
 window.remShow=()=>{v='list';show()};
 
 async function remove(rs){
-  for(const r of rs)for(const m of r.media){try{await mdb.mDel(m.id)}catch(e){}}
+  for(const r of rs){await unsync(r);for(const m of r.media){try{await mdb.mDel(m.id)}catch(e){}}}
   const ids=new Set(rs.map(r=>r.id));
   R.items=R.items.filter(r=>!ids.has(r.id));sv();show();
 }
@@ -66,10 +123,12 @@ async function save(){
     const id=mdb.uid();
     try{await mdb.mPut({id,blob:f});r.media.push({id,kind:f.type.startsWith('video')?'video':'photo',name:f.name||('media-'+id),type:f.type})}catch(e){bad++}
   }
+  await sync(r);
   R.items.push(r);
   if(!sv()){R.items.pop();return}
   v='list';draft={files:[]};show();
   if(bad)toast('Не удалось сохранить файлов: '+bad);
+  else if(r.push==='err')toast('Сохранено, но уведомление не запланировано: нет связи с сервером');
   detail(r,true);
 }
 
@@ -88,13 +147,18 @@ function cal(r){
 }
 
 function detail(r,fresh){
+  const psText={ok:'Уведомление запланировано: оно придёт в это время.',err:'Не удалось запланировать уведомление на сервере.',off:'Уведомления не настроены, поэтому оповещения не будет.',past:'Время уже прошло, уведомление не планировалось.'}[r.push]||'Уведомление не запланировано.';
+  const showPush=r.push!=='ok'&&r.push!=='past';
+  const pLbl=pushOn()?(r.push==='err'?'Повторить':'Запланировать уведомление'):'Настроить уведомления';
   openSheet(`<h2>${fresh?'Напоминание сохранено':'Напоминание'}</h2><b>${esc(when(r.when))}</b><p class="txt">${esc(r.text)}</p>
   ${r.media.length?`<div class="gr">${r.media.map(thumb).join('')}</div>`:''}
-  <p class="mute" style="margin-top:14px">Чтобы уведомление пришло в это время, добавьте напоминание в Календарь iPhone. Если откроется меню, выберите «Календарь». Если нет, сохраните файл в «Файлы» и нажмите на него: Календарь предложит добавить событие.</p>
-  <button class="primary" id="d_cal">Добавить в Календарь</button><button class="ghost" id="d_x">Закрыть</button>`);
+  <p class="mute" style="margin-top:14px">${psText}</p>
+  ${showPush?`<button class="primary" id="d_push">${pLbl}</button>`:''}
+  <button class="ghost" id="d_cal">Дополнительно: добавить в Календарь</button><button class="ghost" id="d_x">Закрыть</button>`);
   hy($('#sheet'));
   $('#d_x').onclick=closeSheet;
   $('#d_cal').onclick=()=>cal(r);
+  const dp=$('#d_push');if(dp)dp.onclick=async()=>{if(!pushOn()){pushSheet();return}await sync(r);sv();detail(r)};
   $('#sheet').onclick=e=>{const b=e.target.closest('[data-mv]');if(b)mview(r,b.dataset.mv)};
 }
 async function mview(r,id){
@@ -116,6 +180,7 @@ body.addEventListener('click',async e=>{
     if(a==='new'){draft={files:[]};v='new';show()}
     else if(a==='list'){v='list';show()}
     else if(a==='save')save();
+    else if(a==='push')pushSheet();
     else if(a==='clrf'){draft.files=[];flist()}
     else if(a==='clr'){const ps=R.items.filter(past);if(ps.length&&confirm('Удалить всю историю ('+ps.length+' шт.) вместе с файлами?'))await remove(ps)}
     return;

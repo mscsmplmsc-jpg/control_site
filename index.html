@@ -212,7 +212,7 @@ function refresh(){
 /* форма дня */
 function addRow(){
   const r=document.createElement('div');r.className='row';
-  r.innerHTML='<input class="n" list="pupils" placeholder="Имя ученика"><input class="p" inputmode="decimal" placeholder="Цена"><button type="button" class="x" aria-label="Убрать ученика">×</button>';
+  r.innerHTML='<input class="n" list="pupils" placeholder="Имя ученика" autocomplete="off" autocorrect="off" name="s'+Math.random().toString(36).slice(2)+'" value=""><input class="p" inputmode="decimal" placeholder="Цена" autocomplete="off" name="c'+Math.random().toString(36).slice(2)+'" value=""><button type="button" class="x" aria-label="Убрать ученика">×</button>';
   $('#rows').appendChild(r);return r;
 }
 function num(v){const n=parseFloat(String(v).replace(/\s/g,'').replace(',','.'));return n}
@@ -224,7 +224,7 @@ function lastPrice(name,studio){
   return '';
 }
 function daySum(){let t=0;$$('#rows .p').forEach(p=>{const n=num(p.value);if(n>0)t+=n});$('#daysum').textContent=fmt(t)}
-$('#addrow').onclick=()=>addRow().querySelector('.n').focus();
+$('#addrow').onclick=()=>addRow();
 $('#rows').addEventListener('click',e=>{if(e.target.closest('.x')){const rows=$$('#rows .row');if(rows.length>1)e.target.closest('.row').remove();else rows[0].querySelectorAll('input').forEach(i=>i.value='');daySum()}});
 $('#rows').addEventListener('input',e=>{if(e.target.classList.contains('p'))daySum()});
 $('#rows').addEventListener('change',e=>{
