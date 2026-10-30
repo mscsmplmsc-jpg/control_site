@@ -56,7 +56,9 @@ async function share(blob,name,type,u){
 window.mdb={mPut,mGet,mDel,url,share,uid};
 
 /* отображение */
-const rank=p=>p.sex?(p.ended?3:1):p.friend?4:p.ended?5:2;
+const MK=()=>!!(feat&&feat.marks);
+const rank=p=>!MK()?2:(p.sex?(p.ended?3:1):p.friend?4:p.ended?5:2);
+const helpHtml=h=>MK()?h:h.replace(/<li>Порядок групп[^]*?<\/li>/,'').replace(/<li><b>Отметки<\/b>[^]*?<\/li>/,'').replace(/<li>Текстовые поля отметок[^]*?<\/li>/,'').replace(' и отметки','');
 const byName=(a,b)=>a.name.localeCompare(b.name,'ru');
 const av=(p,big)=>p.photo?`<img class="av${big?' big':''}" data-m="${p.photo}" alt="">`:`<span class="av${big?' big':''}">${esc((p.name[0]||'?').toUpperCase())}</span>`;
 const met=p=>[p.metWhen,p.metWhere].filter(Boolean).join(', ');
@@ -64,7 +66,7 @@ const lines=s=>s.split('\n').map(x=>x.trim()).filter(Boolean).map(x=>/^https?:\/
 const tel=n=>`<a href="tel:${esc(n.replace(/[^\d+]/g,''))}">${esc(n)}</a>`;
 
 function mini(p,flags,gap){
-  return `<div class="pc${gap?' gap':''}" data-a="open" data-id="${p.id}">${av(p)}<div class="pi"><b>${esc(p.name)}</b>${flags?(p.sex?'<span class="tag">был секс</span>':'')+(p.ended?'<span class="tag">общение закончено</span>':'')+(p.friend?'<span class="tag">её друг</span>':''):''}
+  return `<div class="pc${gap?' gap':''}" data-a="open" data-id="${p.id}">${av(p)}<div class="pi"><b>${esc(p.name)}</b>${flags&&MK()?(p.sex?'<span class="tag">был секс</span>':'')+(p.ended?'<span class="tag">общение закончено</span>':'')+(p.friend?'<span class="tag">её друг</span>':''):''}
   ${met(p)?`<div class="mute">Познакомились: ${esc(met(p))}</div>`:''}${p.bday?`<div class="mute">День рождения: ${fdate(p.bday)}</div>`:''}${p.phone?`<div class="mute">${esc(p.phone)}</div>`:''}</div></div>`;
 }
 function vList(){
@@ -91,10 +93,10 @@ function vCard(p){
   <h2>Общий круг</h2>
   ${ln.map(q=>mini(q,false)).join('')}
   <button class="ghost" data-a="linkpick">+ Связать с карточкой</button>
-  <h2>Отметки</h2>
+  ${MK()?`<h2>Отметки</h2>
   ${ck('sex','был секс')}${p.sex?ta('sexNotes','Заметки о сексе',4):''}
   ${ck('ended','общение закончено')}${p.ended?ta('reason','Причина',3):''}
-  ${ck('friend','её друг')}`;
+  ${ck('friend','её друг')}`:''}`;
 }
 function vEdit(p){
   const n=!p;p=p||{name:'',metWhen:'',metWhere:'',bday:'',phone:'',socials:'',bio:'',memories:'',plans:''};
@@ -164,7 +166,8 @@ function meetsSheet(p){
 function linkSheet(p){
   const o=C.people.filter(q=>q.id!==p.id).sort(byName);
   openSheet(`<h2>Общий круг</h2>${o.length?o.map(q=>`<label class="ck"><input type="checkbox" data-l="${q.id}" ${p.links.includes(q.id)?'checked':''}> ${esc(q.name)}</label>`).join(''):'<p class="mute">Сначала создайте другие карточки.</p>'}<button class="primary" id="l_ok">Готово</button>`);
-  $('#l_ok').onclick=()=>{closeSheet();show(true)};
+  window._sc=()=>show(true);
+  $('#l_ok').onclick=closeSheet;
   $('#sheet').onchange=e=>{const id=e.target.dataset.l;if(id){link(p.id,id,e.target.checked);sv()}};
 }
 async function viewer(p,mid){
@@ -193,10 +196,10 @@ function exportText(){
     blk('Соцсети',p.socials);blk('Личная информация',p.bio);blk('Ключевые воспоминания',p.memories);blk('Совместные планы',p.plans);
     if(p.meets.length){out.push('','История встреч:');[...p.meets].sort((a,b)=>a.date.localeCompare(b.date)).forEach(m=>out.push('  '+fdate(m.date)+' — '+m.text.replace(/\n/g,'\n    ')))}
     const ln=p.links.map(P).filter(Boolean).map(q=>q.name);if(ln.length)out.push('','Общий круг: '+ln.join(', '));
-    const fl=[p.sex&&'был секс',p.ended&&'общение закончено',p.friend&&'её друг'].filter(Boolean);
+    const fl=MK()?[p.sex&&'был секс',p.ended&&'общение закончено',p.friend&&'её друг'].filter(Boolean):[];
     if(fl.length)out.push('','Отметки: '+fl.join(', '));
-    if(p.sex)blk('Заметки о сексе',p.sexNotes);
-    if(p.ended)blk('Причина',p.reason);
+    if(MK()&&p.sex)blk('Заметки о сексе',p.sexNotes);
+    if(MK()&&p.ended)blk('Причина',p.reason);
     if(p.media.length)out.push('','Медиафайлов в приложении: '+p.media.length+' (в выгрузку не входят)');
     out.push('','');
   });
@@ -205,7 +208,7 @@ function exportText(){
 }
 document.addEventListener('click',e=>{
   if(!e.target.closest('[data-help="crm"]'))return;
-  openSheet(`<h2>Инструкция по CRM</h2>
+  openSheet(helpHtml(`<h2>Инструкция по CRM</h2>
 <p class="mute">Здесь хранятся карточки знакомых, чтобы ничего о людях не забывать. Всё лежит только в этом телефоне.</p>
 <h2>Создать карточку</h2>
 <ul><li>Нажмите «+ Новая карточка». Обязательно только имя, остальное заполняйте по желанию.</li>
@@ -231,7 +234,7 @@ document.addEventListener('click',e=>{
 <ul><li>«Пароль» вверху экрана ставит, меняет или снимает пароль на раздел. Забытый пароль восстановить нельзя.</li>
 <li>Пароль спросят снова после полного закрытия приложения.</li>
 <li>Резервная копия в разделе «Учет часов» (Статистика → «Резервная копия данных») сохраняет и текст CRM, но не фото и видео. Если очистить данные Safari или удалить иконку, медиа пропадут безвозвратно.</li></ul>
-<button class="ghost" id="hx">Закрыть</button>`);
+<button class="ghost" id="hx">Закрыть</button>`));
   $('#hx').onclick=closeSheet;
 });
 

@@ -78,6 +78,7 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
   <button class="tile" data-go="crm" style="margin-top:12px"><b>CRM</b><span>Карточки знакомых</span></button>
   <button class="tile" data-go="rem" style="margin-top:12px"><b>Напоминания</b><span>Уведомления в нужное время</span></button>
   <button class="tile" data-go="tsk" style="margin-top:12px"><b>Список задач</b><span>Проекты, подзадачи, сроки и приоритеты</span></button>
+  <div style="text-align:center;margin-top:26px"><button class="ghost" id="codebtn" style="font-size:14px;color:var(--mute)">Ввести код</button></div>
 </section>
 
 <section id="hours" hidden>
@@ -155,8 +156,9 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(db));return true}cat
 let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2600)}
 
 /* окно-шторка */
-function openSheet(h){$('#md').hidden=false;$('#sheet').innerHTML=h;document.body.style.overflow='hidden'}
-function closeSheet(){const s=$('#sheet');s.onclick=s.onchange=null;$('#md').hidden=true;s.innerHTML='';document.body.style.overflow=''}
+function openSheet(h){window._sc=null;$('#md').hidden=false;$('#sheet').innerHTML=h;document.body.style.overflow='hidden'}
+function closeSheet(){const h=window._sc;window._sc=null;const s=$('#sheet');s.onclick=s.onchange=null;$('#md').hidden=true;s.innerHTML='';document.body.style.overflow='';if(h)h()}
+$('#md').addEventListener('click',e=>{if(e.target.id==='md')closeSheet()});
 
 /* пароли разделов */
 const LK='locks-v1';let locks={};try{locks=JSON.parse(localStorage.getItem(LK))||{}}catch(e){}
@@ -164,8 +166,8 @@ const unlocked=new Set(),enc=new TextEncoder();
 async function hp(pw,salt){const k=await crypto.subtle.importKey('raw',enc.encode(pw),'PBKDF2',false,['deriveBits']);const b=await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode(salt),iterations:150000,hash:'SHA-256'},k,256);return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 function askPw(sec){return new Promise(res=>{
   openSheet('<h2>Введите пароль</h2><input id="pw" type="password" placeholder="Пароль"><div class="err" id="pe"></div><button class="primary" id="pok">Открыть</button><button class="ghost" id="pno">Отмена</button>');
-  const ok=async()=>{if(await hp($('#pw').value,locks[sec].s)===locks[sec].h){unlocked.add(sec);closeSheet();res(true)}else{$('#pe').textContent='Неверный пароль';$('#pw').value=''}};
-  $('#pok').onclick=ok;$('#pw').onkeydown=e=>{if(e.key==='Enter')ok()};$('#pno').onclick=()=>{closeSheet();res(false)};$('#pw').focus();
+  const ok=async()=>{if(await hp($('#pw').value,locks[sec].s)===locks[sec].h){unlocked.add(sec);window._sc=null;closeSheet();res(true)}else{$('#pe').textContent='Неверный пароль';$('#pw').value=''}};
+  $('#pok').onclick=ok;$('#pw').onkeydown=e=>{if(e.key==='Enter')ok()};window._sc=()=>res(false);$('#pno').onclick=closeSheet;$('#pw').focus();
 })}
 function lockSheet(sec){
   const has=!!locks[sec];
@@ -178,6 +180,20 @@ function lockSheet(sec){
     localStorage.setItem(LK,JSON.stringify(locks));closeSheet();toast(n?'Пароль установлен':'Защита снята');
   };
 }
+
+/* секретные коды */
+const FK='feat-v1';let feat={};try{feat=JSON.parse(localStorage.getItem(FK))||{}}catch(e){}
+const CODES={marks:'da6dad2aebb03ee105f7d36e3621333894a15d40a01ce2a4069a69f95df179aa',chat:'1d2d651d74e62bb2fff5b89dfcd9d032364cbc31176a83a7eea67874a65a1266'};
+async function sha(s){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode(s)))].map(x=>x.toString(16).padStart(2,'0')).join('')}
+$('#codebtn').onclick=()=>{
+  openSheet('<h2>Введите код</h2><input id="cd" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="Код"><div class="err" id="ce"></div><button class="primary" id="cok">Применить</button><button class="ghost" id="cno">Закрыть</button>');
+  const apply=async()=>{
+    const h=await sha($('#cd').value.trim()),k=Object.keys(CODES).find(x=>CODES[x]===h);
+    if(!k){$('#ce').textContent='Неверный код';return}
+    feat[k]=true;localStorage.setItem(FK,JSON.stringify(feat));closeSheet();toast('Готово');
+  };
+  $('#cok').onclick=apply;$('#cd').onkeydown=e=>{if(e.key==='Enter')apply()};$('#cno').onclick=closeSheet;
+};
 
 /* навигация */
 async function go(id){

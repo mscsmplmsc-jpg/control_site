@@ -55,7 +55,8 @@ function pushSheet(){
   <button class="ghost" id="p_x">Закрыть</button>`);
   const msg=t=>{$('#p_msg').textContent=t};
   const store=()=>{cfg={url:$('#p_u').value.trim(),token:$('#p_t').value.trim()};localStorage.setItem(PC,JSON.stringify(cfg))};
-  $('#p_x').onclick=()=>{closeSheet();show()};
+  window._sc=()=>show();
+  $('#p_x').onclick=closeSheet;
   $('#p_on').onclick=async()=>{
     store();
     if(!cfg.url||!cfg.token){msg('Заполните адрес сервера и секретный код.');return}
