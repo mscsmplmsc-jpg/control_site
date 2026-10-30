@@ -20,6 +20,13 @@ document.head.appendChild(st);
 const TK='tasks-v1';
 const COLORS=[['#d9534f','красный'],['#e8923a','оранжевый'],['#d4b200','жёлтый'],['#4a9d5b','зелёный'],['#2fa7a0','бирюзовый'],['#4a7fd4','синий'],['#8e6bbf','фиолетовый'],['#8a949a','серый']];
 const PR=['нет','низкий','средний','высокий'];
+const REP={day:'каждый день',week:'каждую неделю',month:'каждый месяц',year:'каждый год'};
+function addRep(s,rep){
+  const [y,m,d]=s.split('-').map(Number);
+  if(rep==='day'||rep==='week')return iso(new Date(y,m-1,d+(rep==='day'?1:7)));
+  const tm=m-1+(rep==='month'?1:12),last=new Date(y,tm+1,0).getDate();
+  return iso(new Date(y,tm,Math.min(d,last)));
+}
 let T={projects:[],tasks:[],legend:{}};
 try{const j=JSON.parse(localStorage.getItem(TK));if(j&&Array.isArray(j.projects)&&Array.isArray(j.tasks))T={legend:{},...j}}catch(e){}
 const sv=()=>{try{localStorage.setItem(TK,JSON.stringify(T));return true}catch(e){toast('Не удалось сохранить данные');return false}};
@@ -41,7 +48,7 @@ const opts=(l,s)=>l.map(([v,t])=>`<option value="${v}"${String(v)===String(s)?' 
 function row(t,withProj){
   const p=withProj&&proj(t.pid);
   const subs=t.subs.length?`подзадачи ${t.subs.filter(s=>s.done).length}/${t.subs.length}`:'';
-  const meta=[p?esc(p.name):'',t.due?`<span class="${over(t)?'od':''}">${fdate(t.due)}</span>`:'',t.prio?PR[t.prio]:'',subs].filter(Boolean).join(' · ');
+  const meta=[p?esc(p.name):'',t.due?`<span class="${over(t)?'od':''}">${fdate(t.due)}</span>`:'',t.prio?PR[t.prio]:'',t.rep?'↻ '+REP[t.rep]:'',subs].filter(Boolean).join(' · ');
   return `<div class="tk${t.done?' dn':''}" data-a="task" data-id="${t.id}"><input type="checkbox" data-chk="${t.id}" ${t.done?'checked':''} aria-label="Выполнено">${dot(t.color)}<div class="pi"><b>${esc(t.title)}</b>${meta?`<div class="mute">${meta}</div>`:''}</div></div>`;
 }
 function pcard(p){
@@ -63,7 +70,7 @@ function res(){
 function vHome(){
   const tags=[...new Set(T.projects.flatMap(p=>p.tags))].sort();
   const n=todayList().length;
-  return `<div class="acts"><button class="sm" data-a="today">Сегодня${n?' · '+n:''}</button><button class="sm" data-a="arch">Архив</button></div>
+  return `<div class="acts"><button class="sm" data-a="today">Сегодня${n?' · '+n:''}</button><button class="sm" data-a="arch">Архив</button>${T.projects.length?'<button class="sm" data-a="quick">Быстрое добавление</button>':''}</div>
   <input id="t_q" placeholder="Поиск по задачам" value="${esc(F.q||'')}" style="margin-bottom:10px">
   <label>Тег<select id="t_tag">${opts([['','Все проекты'],...tags.map(x=>[x,'#'+x])],F.tag||'')}</select></label>
   <button class="primary" data-a="newp">+ Новый проект</button>
@@ -82,6 +89,7 @@ function vProj(p){
   <div class="bar2"><i style="width:${all.length?Math.round(dn/all.length*100):0}%"></i></div><div class="mute">Выполнено ${dn} из ${all.length}</div>
   <div class="acts" style="margin-top:12px"><button class="sm" data-a="editp">Изменить проект</button><button class="sm" data-a="archdone">В архив выполненные</button></div>
   <button class="primary" data-a="newt">+ Новая задача</button>
+  <button class="sm" data-a="quick" style="margin-top:10px">Быстрое добавление</button>
   <div class="grid2" style="margin-top:12px">
     <label>Статус<select id="f_st">${opts([['','Все'],['act','Активные'],['done','Выполненные'],['over','Просроченные']],F.st||'')}</select></label>
     <label>Приоритет<select id="f_pr">${opts([['','Любой'],['3','Высокий'],['2','Средний'],['1','Низкий'],['0','Без приоритета']],F.pr||'')}</select></label>
@@ -94,6 +102,7 @@ function vTask(t){
   <div class="hd" style="margin:4px 0 8px"><input type="checkbox" data-chk="${t.id}" ${t.done?'checked':''} style="width:26px;height:26px;margin:0;flex:none"><h1 style="margin:0${t.done?';text-decoration:line-through':''}">${esc(t.title)}</h1></div>
   <div class="inf"><span>Срок</span><span class="${over(t)?'od':''}">${t.due?fdate(t.due):'не задан'}</span></div>
   <div class="inf"><span>Приоритет</span><span>${PR[t.prio|0]}</span></div>
+  ${t.rep?`<div class="inf"><span>Повтор</span><span>${REP[t.rep]}</span></div>`:''}
   ${t.color?`<div class="inf"><span>Цвет</span><span>${dot(t.color)} ${esc(T.legend[t.color]||cname(t.color))}</span></div>`:''}
   ${t.desc?`<h2>Описание</h2><p class="txt">${esc(t.desc)}</p>`:''}
   <h2>Подзадачи</h2>
@@ -165,6 +174,7 @@ function taskSheet(t,pid){
   <div class="grid2"><label>Срок<input type="date" id="tk_due" value="${t?t.due||'':''}"></label>
   <label>Приоритет<select id="tk_p">${opts([[3,'Высокий'],[2,'Средний'],[1,'Низкий'],[0,'Без приоритета']],t?t.prio|0:0)}</select></label></div>
   <label>Проект<select id="tk_pr">${T.projects.map(p=>`<option value="${p.id}"${p.id===(t?t.pid:pid)?' selected':''}>${esc(p.name)}</option>`).join('')}</select></label>
+  <label>Повтор (нужен срок)<select id="tk_rep">${opts([['','Не повторять'],...Object.entries(REP)],t?t.rep||'':'')}</select></label>
   <div class="lbl">Цвет</div>${swatches(col)}
   <button class="primary" id="tk_s" style="margin-top:12px">Сохранить</button><button class="ghost" id="tk_c">Закрыть</button>`);
   swLbl(col);
@@ -172,7 +182,9 @@ function taskSheet(t,pid){
   $('#tk_c').onclick=closeSheet;
   $('#tk_s').onclick=()=>{
     const title=$('#tk_n').value.trim();if(!title){toast('Укажите название');return}
-    const o={title,desc:$('#tk_d').value.trim(),due:$('#tk_due').value,prio:+$('#tk_p').value,pid:$('#tk_pr').value,color:col};
+    const rep=$('#tk_rep').value,due=$('#tk_due').value;
+    if(rep&&!due){toast('Для повторяющейся задачи укажите срок');return}
+    const o={title,desc:$('#tk_d').value.trim(),due,prio:+$('#tk_p').value,pid:$('#tk_pr').value,color:col,rep};
     if(t)Object.assign(t,o);else{t={id:uid(),done:false,archived:false,subs:[],comments:[],created:Date.now(),...o};T.tasks.push(t)}
     sv();closeSheet();v=v.n==='task'?{n:'task',id:t.id}:{n:'proj',id:t.pid};show();
   };
@@ -183,6 +195,22 @@ function legendSheet(){
   <button class="primary" id="lg_s">Готово</button>`);
   $('#sheet').onchange=e=>{const c=e.target.dataset.lg;if(c){T.legend[c]=e.target.value.trim();sv()}};
   $('#lg_s').onclick=()=>{closeSheet();show(true)};
+}
+function quickSheet(pid){
+  if(!T.projects.length){toast('Сначала создайте проект');return}
+  openSheet(`<h2>Быстрое добавление</h2><p class="mute">Каждая строка станет отдельной задачей. Подробности можно добавить позже, открыв задачу.</p>
+  <label>Проект<select id="q_p">${T.projects.map(p=>`<option value="${p.id}"${p.id===pid?' selected':''}>${esc(p.name)}</option>`).join('')}</select></label>
+  <label>Задачи, по одной в строке<textarea id="q_t" rows="8" placeholder="Молоко&#10;Хлеб&#10;Яйца"></textarea></label>
+  <button class="primary" id="q_s">Добавить</button><button class="ghost" id="q_c">Закрыть</button>`);
+  $('#q_c').onclick=closeSheet;
+  $('#q_s').onclick=()=>{
+    const ls=$('#q_t').value.split('\n').map(x=>x.replace(/^[\s\-–—•*·]+/,'').replace(/^\d+[.)]\s+/,'').trim()).filter(Boolean);
+    if(!ls.length){toast('Впишите хотя бы одну задачу');return}
+    const p2=$('#q_p').value,now=Date.now();
+    ls.forEach((title,i)=>T.tasks.push({id:uid(),pid:p2,title,desc:'',due:'',prio:0,color:'',rep:'',done:false,archived:false,subs:[],comments:[],created:now+i}));
+    sv();closeSheet();v={n:'proj',id:p2};show();toast('Добавлено задач: '+ls.length);
+  };
+  setTimeout(()=>{const t=$('#q_t');if(t)t.focus()},60);
 }
 document.addEventListener('click',e=>{if(e.target.closest('[data-tmap]'))legendSheet()});
 
@@ -198,6 +226,7 @@ body.addEventListener('click',e=>{
   else if(a==='today'){v={n:'today'};show()}
   else if(a==='arch'){v={n:'arch'};show()}
   else if(a==='newp')projSheet(null);
+  else if(a==='quick')quickSheet(p?p.id:'');
   else if(a==='editp'&&p)projSheet(p);
   else if(a==='newt'&&p)taskSheet(null,p.id);
   else if(a==='editt'&&t)taskSheet(t);
@@ -214,7 +243,15 @@ body.addEventListener('click',e=>{
 });
 body.addEventListener('change',e=>{
   const x=e.target;
-  if(x.dataset.chk){const t=task(x.dataset.chk);if(t){t.done=x.checked;t.doneAt=x.checked?Date.now():null;sv();show(true)}}
+  if(x.dataset.chk){
+    const t=task(x.dataset.chk);
+    if(t&&x.checked&&t.rep&&t.due){
+      T.tasks.push({...t,id:uid(),done:true,doneAt:Date.now(),archived:true,rep:'',comments:[],subs:t.subs.map(s=>({...s,id:uid()}))});
+      let d=addRep(t.due,t.rep);while(d<=today())d=addRep(d,t.rep);
+      t.due=d;t.done=false;t.doneAt=null;t.subs.forEach(s=>{s.done=false});
+      sv();show(true);toast('Выполнено. Следующий срок: '+fdate(t.due));
+    }else if(t){t.done=x.checked;t.doneAt=x.checked?Date.now():null;sv();show(true)}
+  }
   else if(x.dataset.sub){const t=task(v.id),s=t&&t.subs.find(q=>q.id===x.dataset.sub);if(s){s.done=x.checked;sv();show(true)}}
   else if(x.id==='t_tag'){F.tag=x.value;$('#t_res').innerHTML=res()}
   else if(x.id==='f_st'){F.st=x.value;show(true)}
