@@ -105,7 +105,7 @@ function gate(msg){
   <label>Имя<input id="a_n" autocapitalize="off" autocorrect="off" autocomplete="username"></label>
   <label>Пароль<input id="a_p" type="password" autocomplete="current-password"></label>
   <div class="err" id="a_e">${esc(msg||'')}</div>
-  <button class="primary" id="a_in">Войти</button><button class="ghost" id="a_up">Создать аккаунт</button><button class="ghost" id="a_ping" style="color:var(--mute);font-size:14px">Проверить связь с сервером</button><div id="a_d"></div></div>`;
+  <button class="primary" id="a_in">Войти</button><button class="ghost" id="a_up">Создать аккаунт</button><button class="ghost" id="a_ping" style="color:var(--mute);font-size:14px">Проверить связь с сервером</button><button class="ghost" id="a_skip" style="color:var(--mute);font-size:14px">Продолжить без входа (данные только на этом устройстве)</button><div id="a_d"></div></div>`;
   $('#a_in').onclick=()=>login('login');$('#a_up').onclick=()=>login('reg');
   $('#a_ping').onclick=async()=>{
     const el=$('#a_e');el.textContent='Проверяю связь…';
@@ -114,6 +114,7 @@ function gate(msg){
     catch(e){el.textContent='Сервер не отвечает за 15 секунд. Возможно, соединение с ним блокирует провайдер или сеть. Попробуйте Wi-Fi или другой интернет.'}
     finally{clearTimeout(tm)}
   };
+  $('#a_skip').onclick=()=>{localStorage.setItem('auth-skip','1');$('#auth').hidden=true};
   $('#a_p').onkeydown=e=>{if(e.key==='Enter')login('login')};
 }
 let logging=false;
@@ -124,7 +125,7 @@ async function login(op,remove){
   $('#a_e').textContent='Подождите… (до 20 секунд)';logging=true;$$('#auth button').forEach(b=>{b.disabled=true});
   try{
     const j=await call({op,name,pass,label:devLabel(),remove});
-    if(j.ok){sess={t:j.token,user:j.user};localStorage.setItem(SK,JSON.stringify(sess));S={};saveS();$('#auth').hidden=true;$('#acctbtn').hidden=false;syncNow();return}
+    if(j.ok){sess={t:j.token,user:j.user};localStorage.setItem(SK,JSON.stringify(sess));localStorage.removeItem('auth-skip');S={};saveS();$('#auth').hidden=true;$('#acctbtn').hidden=false;syncNow();return}
     if(j.error==='limit'){
       $('#a_e').textContent='На этом аккаунте уже запомнено 3 устройства. Уберите одно, чтобы войти здесь.';
       $('#a_d').innerHTML=j.devices.map(d=>`<div class="dv"><span>${esc(d.label)}<br><span class="mute">был в сети ${fdate(iso(new Date(d.last)))}</span></span><button class="sm" data-rm="${esc(d.id)}" style="margin:0">Убрать</button></div>`).join('');
@@ -138,6 +139,7 @@ async function login(op,remove){
 
 /* ---------- аккаунт ---------- */
 function acct(){
+  if(!sess){localStorage.removeItem('auth-skip');gate();return}
   openSheet(`<h2>Аккаунт</h2><p><b>${esc(sess.user)}</b></p><p class="mute" id="ac_s">${esc(statusText())}</p>
   <p class="mute">Тексты синхронизируются между устройствами. Фото и видео остаются только на устройстве, где их добавили.</p>
   <button class="primary" id="ac_sync">Синхронизировать сейчас</button><button class="ghost" id="ac_dev">Устройства</button><button class="ghost" id="ac_out" style="color:var(--bad)">Выйти</button><button class="ghost" id="ac_x">Закрыть</button>`);
@@ -172,5 +174,5 @@ async function logout(){
 $('#acctbtn').onclick=acct;
 $('#acctbtn').hidden=false;
 
-if(sess){syncNow()}else gate();
+if(sess){syncNow()}else if(localStorage.getItem('auth-skip')!=='1')gate();
 })();
