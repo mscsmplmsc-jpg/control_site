@@ -78,6 +78,7 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
   <button class="tile" data-go="crm" style="margin-top:12px"><b>CRM</b><span>Карточки знакомых</span></button>
   <button class="tile" data-go="rem" style="margin-top:12px"><b>Напоминания</b><span>Уведомления в нужное время</span></button>
   <button class="tile" data-go="tsk" style="margin-top:12px"><b>Список задач</b><span>Проекты, подзадачи, сроки и приоритеты</span></button>
+  <button class="tile" id="chattile" data-go="chat" hidden style="margin-top:12px"><b>Мессенджер</b><span>Зашифрованные сообщения и файлы</span></button>
   <div style="text-align:center;margin-top:26px"><button class="ghost" id="acctbtn" hidden style="font-size:14px;color:var(--mute);margin-right:18px">Аккаунт</button><button class="ghost" id="codebtn" style="font-size:14px;color:var(--mute)">Ввести код</button></div>
 </section>
 
@@ -132,6 +133,11 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
   <div class="bar"><button class="back" data-go="menu">‹ Меню</button><button class="lockbtn" data-tmap="1">Карта маркировки</button><button class="lockbtn" data-lock="tsk">Пароль</button></div>
   <h1>Список задач</h1>
   <div id="tskbody"></div>
+</section>
+<section id="chat" hidden>
+  <div class="bar"><button class="back" data-go="menu">‹ Меню</button><button class="lockbtn" data-lock="chat">Пароль</button></div>
+  <h1>Мессенджер</h1>
+  <div id="chatbody"></div>
 </section>
 <footer class="ft">made by: <a href="https://vk.ru/ferretartem" target="_blank" rel="noopener noreferrer">ArtemoWitch</a></footer>
 </main>
@@ -190,7 +196,7 @@ $('#codebtn').onclick=()=>{
   const apply=async()=>{
     const h=await sha($('#cd').value.trim()),k=Object.keys(CODES).find(x=>CODES[x]===h);
     if(!k){$('#ce').textContent='Неверный код';return}
-    feat[k]=true;localStorage.setItem(FK,JSON.stringify(feat));closeSheet();toast('Готово');
+    feat[k]=true;localStorage.setItem(FK,JSON.stringify(feat));closeSheet();toast('Готово');if(window.featApply)featApply();
   };
   $('#cok').onclick=apply;$('#cd').onkeydown=e=>{if(e.key==='Enter')apply()};$('#cno').onclick=closeSheet;
 };
@@ -198,8 +204,8 @@ $('#codebtn').onclick=()=>{
 /* навигация */
 async function go(id){
   if(id!=='menu'&&locks[id]&&!unlocked.has(id)&&!await askPw(id))return;
-  $('#menu').hidden=id!=='menu';$('#hours').hidden=id!=='hours';$('#crm').hidden=id!=='crm';$('#rem').hidden=id!=='rem';$('#tsk').hidden=id!=='tsk';
-  window.scrollTo(0,0);if(id==='hours')refresh();if(id==='crm'&&window.crmShow)crmShow();if(id==='rem'&&window.remShow)remShow();if(id==='tsk'&&window.tskShow)tskShow();
+  $('#menu').hidden=id!=='menu';$('#hours').hidden=id!=='hours';$('#crm').hidden=id!=='crm';$('#rem').hidden=id!=='rem';$('#tsk').hidden=id!=='tsk';$('#chat').hidden=id!=='chat';
+  window.scrollTo(0,0);if(id==='hours')refresh();if(id==='crm'&&window.crmShow)crmShow();if(id==='rem'&&window.remShow)remShow();if(id==='tsk'&&window.tskShow)tskShow();if(id==='chat'&&window.chatShow)chatShow();
 }
 
 /* правка дня */
@@ -331,5 +337,6 @@ if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWor
 <script src="tasks.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="chat.js"></script>
 </body>
 </html>

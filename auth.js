@@ -29,6 +29,8 @@ async function call(o){
   j._s=r.status;return j;
 }
 const sc=o=>call({s:sess&&sess.t,...o});
+window.authCall=o=>sc(o);
+window.authUser=()=>sess?sess.user:null;
 const sheetOpen=()=>!$('#md').hidden;
 function setStatus(s){status={s,t:Date.now()};const el=$('#ac_s');if(el)el.textContent=statusText()}
 const statusText=()=>status.s==='ok'?'Синхронизировано в '+pad(new Date(status.t).getHours())+':'+pad(new Date(status.t).getMinutes()):status.s==='offline'?'Нет связи с сервером. Изменения отправятся позже.':'Ожидание синхронизации…';
@@ -146,8 +148,9 @@ async function logout(){
   let ok=true;
   try{ok=await pushDirty()}catch(e){ok=false}
   if(!ok&&!confirm('Последние изменения не удалось отправить на сервер, они будут потеряны. Всё равно выйти?')){busy=false;return}
-  try{await sc({op:'logout'})}catch(e){}
-  Object.values(LOC).concat(['feat-v1','locks-v1','push-sub',SK,RK]).forEach(k=>localStorage.removeItem(k));
+  let ep='';try{ep=JSON.parse(localStorage.getItem('push-sub')).endpoint}catch(e){}
+  try{await sc({op:'logout',ep})}catch(e){}
+  Object.values(LOC).concat(['feat-v1','locks-v1','push-sub','chat-peers-v1','chat-seen-v1','chat-files-v1',SK,RK]).forEach(k=>localStorage.removeItem(k));
   const r=indexedDB.open('crm-media',1);
   r.onupgradeneeded=()=>r.result.createObjectStore('m',{keyPath:'id'});
   r.onsuccess=()=>{const t=r.result.transaction('m','readwrite');t.objectStore('m').clear();t.oncomplete=()=>location.reload()};

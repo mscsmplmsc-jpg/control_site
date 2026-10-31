@@ -23,6 +23,7 @@ const thumb=m=>`<button class="th" data-mv="${m.id}">${m.kind==='video'?`<video 
 
 /* push-уведомления через свой сервер на Cloudflare */
 const VAPID_PUB='BHzrb5Enj9P6Yn6N3z26E2t8IsqB8fUzLstt_IxIuETdRhtCEHGmJy1rARsgZsDOB6cQ5ZQCcuUiyiohDApAUAM';
+window.VAPID_PUB=VAPID_PUB;
 const PC='push-cfg-v1';
 let cfg={};try{cfg=JSON.parse(localStorage.getItem(PC))||{}}catch(e){}
 const getSub=()=>{try{return JSON.parse(localStorage.getItem('push-sub'))}catch(e){return null}};
