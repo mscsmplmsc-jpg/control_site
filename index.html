@@ -78,7 +78,7 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
   <button class="tile" data-go="crm" style="margin-top:12px"><b>CRM</b><span>Карточки знакомых</span></button>
   <button class="tile" data-go="rem" style="margin-top:12px"><b>Напоминания</b><span>Уведомления в нужное время</span></button>
   <button class="tile" data-go="tsk" style="margin-top:12px"><b>Список задач</b><span>Проекты, подзадачи, сроки и приоритеты</span></button>
-  <div style="text-align:center;margin-top:26px"><button class="ghost" id="codebtn" style="font-size:14px;color:var(--mute)">Ввести код</button></div>
+  <div style="text-align:center;margin-top:26px"><button class="ghost" id="acctbtn" hidden style="font-size:14px;color:var(--mute);margin-right:18px">Аккаунт</button><button class="ghost" id="codebtn" style="font-size:14px;color:var(--mute)">Ввести код</button></div>
 </section>
 
 <section id="hours" hidden>
@@ -329,5 +329,7 @@ if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWor
 <script src="crm.js"></script>
 <script src="reminders.js"></script>
 <script src="tasks.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
 </body>
 </html>
