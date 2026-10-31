@@ -2,4 +2,4 @@
 // Пока адрес пустой, приложение работает как раньше: без входа и без синхронизации.
 // После настройки впишите сюда адрес, например:
 // window.APP_API = 'https://moi-chasy-push.ваш-аккаунт.workers.dev';
-window.APP_API = '';
+window.APP_API = 'https://moi-chasy-push.mscsmplmsc.workers.dev/';
