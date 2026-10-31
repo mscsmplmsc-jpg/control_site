@@ -41,7 +41,11 @@ const getSub=()=>{try{return JSON.parse(localStorage.getItem('push-sub'))}catch(
 const pushOk=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
 const standalone=()=>navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
 const unb64u=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return Uint8Array.from(atob(s),c=>c.charCodeAt(0))};
-async function api(o){const r=await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({t:cfg.token,...o})});return r.json()}
+async function api(o){
+  const c=new AbortController(),tm=setTimeout(()=>c.abort(),15000);
+  try{const r=await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({t:cfg.token,...o}),signal:c.signal});return await r.json()}
+  finally{clearTimeout(tm)}
+}
 const pushOn=()=>!!(cfg.url&&cfg.token&&getSub()&&pushOk()&&Notification.permission==='granted');
 const pushShort=()=>pushOn()?'включены':'не настроены';
 function pushStatus(){
@@ -95,7 +99,8 @@ function pushSheet(){
   };
 }
 
-let v='list',draft={files:[]};
+let v='list',draft={files:[]},openId=null;
+R.items.forEach(r=>{if(r.push==='wait')r.push='err'});
 
 function vList(){
   const up=R.items.filter(r=>!past(r)).sort((a,b)=>by(a)-by(b));
@@ -134,24 +139,33 @@ async function remove(rs){
   const ids=new Set(rs.map(r=>r.id));
   R.items=R.items.filter(r=>!ids.has(r.id));sv();show();
 }
+let saving=false;
 async function save(){
+  if(saving)return;
   const text=$('#r_t').value.trim(),d=$('#r_d').value,h=$('#r_h').value;
   if(!text||!d||!h){toast('Нужны текст, дата и время');return}
   const rep=$('#r_rep').checked,until=rep?$('#r_until').value:'';
   if(until&&until<d){toast('Дата окончания раньше даты начала');return}
   const r={id:mdb.uid(),text,when:d+'T'+h,media:[]};if(rep){r.rep='day';r.until=until}
+  saving=true;const sb=$('[data-a="save"]');if(sb){sb.disabled=true;sb.textContent='Сохраняю…'}
   let bad=0;
   for(const f of draft.files){
     const id=mdb.uid();
     try{await mdb.mPut({id,blob:f});r.media.push({id,kind:f.type.startsWith('video')?'video':'photo',name:f.name||('media-'+id),type:f.type})}catch(e){bad++}
   }
-  await sync(r);
+  r.push=cfg.url?'wait':'off';
   R.items.push(r);
-  if(!sv()){R.items.pop();return}
-  v='list';draft={files:[]};show();
+  if(!sv()){R.items.pop();saving=false;if(sb){sb.disabled=false;sb.textContent='Сохранить'}return}
+  v='list';draft={files:[]};saving=false;show();
   if(bad)toast('Не удалось сохранить файлов: '+bad);
-  else if(r.push==='err')toast('Сохранено, но уведомление не запланировано: нет связи с сервером');
   detail(r,true);
+  if(cfg.url)bgSync(r); // отправка на сервер идёт в фоне, окно не ждёт
+}
+async function bgSync(r){
+  await sync(r);sv();
+  if(r.push==='err')toast('Напоминание сохранено, но уведомление не запланировано: сервер не отвечает');
+  if(!$('#md').hidden&&$('#d_cal')&&openId===r.id)detail(r,false);
+  else if(v==='list'&&!$('#r_t'))show();
 }
 
 /* Календарь: событие с сигналом в нужное время */
@@ -169,15 +183,15 @@ function cal(r){
 }
 
 function detail(r,fresh){
-  const psText={ok:'Уведомление запланировано: оно придёт в это время.',err:'Не удалось запланировать уведомление на сервере.',off:'Уведомления не настроены, поэтому оповещения не будет.',past:'Время уже прошло, уведомление не планировалось.'}[r.push]||'Уведомление не запланировано.';
-  const showPush=r.push!=='ok'&&r.push!=='past';
+  const psText={wait:'Отправляю уведомление на сервер…',ok:'Уведомление запланировано: оно придёт в это время.',err:'Не удалось запланировать уведомление на сервере.',off:'Уведомления не настроены, поэтому оповещения не будет.',past:'Время уже прошло, уведомление не планировалось.'}[r.push]||'Уведомление не запланировано.';
+  const showPush=r.push!=='ok'&&r.push!=='past'&&r.push!=='wait';
   const pLbl=pushOn()?(r.push==='err'?'Повторить':'Запланировать уведомление'):'Настроить уведомления';
   openSheet(`<h2>${fresh?'Напоминание сохранено':'Напоминание'}</h2><b>${esc(whenText(r))}</b><p class="txt">${esc(r.text)}</p>
   ${r.media.length?`<div class="gr">${r.media.map(thumb).join('')}</div>`:''}
   <p class="mute" style="margin-top:14px">${psText}</p>
   ${showPush?`<button class="primary" id="d_push">${pLbl}</button>`:''}
   <button class="ghost" id="d_cal">Дополнительно: добавить в Календарь</button><button class="ghost" id="d_x">Закрыть</button>`);
-  hy($('#sheet'));
+  hy($('#sheet'));openId=r.id;window._sc=()=>{openId=null};
   $('#d_x').onclick=closeSheet;
   $('#d_cal').onclick=()=>cal(r);
   const dp=$('#d_push');if(dp)dp.onclick=async()=>{if(!pushOn()){pushSheet();return}await sync(r);sv();detail(r)};

@@ -24,9 +24,12 @@ function setLoc(k,s){
 const isEmpty=(k,s)=>k==='meta'?(!s||s===EMPTY_META):!s;
 
 async function call(o){
-  const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(o)});
-  let j={};try{j=await r.json()}catch(e){}
-  j._s=r.status;return j;
+  const c=new AbortController(),tm=setTimeout(()=>c.abort(),20000);
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(o),signal:c.signal});
+    let j={};try{j=await r.json()}catch(e){}
+    j._s=r.status;return j;
+  }finally{clearTimeout(tm)}
 }
 const sc=o=>call({s:sess&&sess.t,...o});
 window.authCall=o=>sc(o);
@@ -102,14 +105,23 @@ function gate(msg){
   <label>Имя<input id="a_n" autocapitalize="off" autocorrect="off" autocomplete="username"></label>
   <label>Пароль<input id="a_p" type="password" autocomplete="current-password"></label>
   <div class="err" id="a_e">${esc(msg||'')}</div>
-  <button class="primary" id="a_in">Войти</button><button class="ghost" id="a_up">Создать аккаунт</button><div id="a_d"></div></div>`;
+  <button class="primary" id="a_in">Войти</button><button class="ghost" id="a_up">Создать аккаунт</button><button class="ghost" id="a_ping" style="color:var(--mute);font-size:14px">Проверить связь с сервером</button><div id="a_d"></div></div>`;
   $('#a_in').onclick=()=>login('login');$('#a_up').onclick=()=>login('reg');
+  $('#a_ping').onclick=async()=>{
+    const el=$('#a_e');el.textContent='Проверяю связь…';
+    const t0=Date.now(),c=new AbortController(),tm=setTimeout(()=>c.abort(),15000);
+    try{const r=await fetch(API,{cache:'no-store',signal:c.signal});const j=await r.json();el.textContent=j&&j.ok?'Сервер отвечает ('+(Date.now()-t0)+' мс).':'Сервер ответил странно (код '+r.status+').'}
+    catch(e){el.textContent='Сервер не отвечает за 15 секунд. Возможно, соединение с ним блокирует провайдер или сеть. Попробуйте Wi-Fi или другой интернет.'}
+    finally{clearTimeout(tm)}
+  };
   $('#a_p').onkeydown=e=>{if(e.key==='Enter')login('login')};
 }
+let logging=false;
 async function login(op,remove){
+  if(logging)return;
   const name=$('#a_n').value,pass=$('#a_p').value;
   if(!name.trim()||!pass){$('#a_e').textContent='Введите имя и пароль';return}
-  $('#a_e').textContent='Подождите…';
+  $('#a_e').textContent='Подождите… (до 20 секунд)';logging=true;$$('#auth button').forEach(b=>{b.disabled=true});
   try{
     const j=await call({op,name,pass,label:devLabel(),remove});
     if(j.ok){sess={t:j.token,user:j.user};localStorage.setItem(SK,JSON.stringify(sess));S={};saveS();$('#auth').hidden=true;$('#acctbtn').hidden=false;syncNow();return}
@@ -120,7 +132,8 @@ async function login(op,remove){
       return;
     }
     $('#a_e').textContent=j.error||'Ошибка входа';
-  }catch(e){$('#a_e').textContent='Нет связи с сервером'}
+  }catch(e){$('#a_e').textContent='Сервер не отвечает. Проверьте интернет и нажмите «Проверить связь с сервером».'}
+  finally{logging=false;$$('#auth button').forEach(b=>{b.disabled=false})}
 }
 
 /* ---------- аккаунт ---------- */
