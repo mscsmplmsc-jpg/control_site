@@ -15,9 +15,20 @@ const sv=()=>{try{localStorage.setItem(RK,JSON.stringify(R));return true}catch(e
 window.remGet=()=>R;
 window.remSet=r=>{if(r&&Array.isArray(r.items)){R=r;sv()}};
 
-const when=w=>{const [d,t]=w.split('T');return fdate(d)+', '+t};
-const past=r=>new Date(r.when)<new Date();
-const by=r=>r.when;
+const hmOf=w=>w.split('T')[1];
+const whenText=r=>r.rep?('каждый день в '+hmOf(r.when)+', с '+fdate(r.when.split('T')[0])+(r.until?' по '+fdate(r.until):'')):fdate(r.when.split('T')[0])+', '+hmOf(r.when);
+const untilMs=r=>r.until?new Date(r.until+'T'+hmOf(r.when)).getTime():0;
+const lastMs=r=>r.rep?(r.until?untilMs(r):Infinity):new Date(r.when).getTime();
+const past=r=>lastMs(r)<Date.now();
+function nextAt(r){
+  const start=new Date(r.when).getTime();
+  if(!r.rep)return start;
+  const now=Date.now(),lim=untilMs(r)||Infinity;
+  const d=new Date(start);
+  while(d.getTime()<=now&&d.getTime()<=lim)d.setDate(d.getDate()+1);
+  return d.getTime()<=lim?d.getTime():null;
+}
+const by=r=>nextAt(r)||0;
 async function hy(root){for(const el of root.querySelectorAll('[data-m]')){const u=await mdb.url(el.dataset.m);if(u)el.src=u+(el.tagName==='VIDEO'?'#t=0.1':'')}}
 const thumb=m=>`<button class="th" data-mv="${m.id}">${m.kind==='video'?`<video data-m="${m.id}" preload="metadata" muted playsinline></video><span class="pl">▶</span>`:`<img data-m="${m.id}" alt="">`}</button>`;
 
@@ -41,9 +52,13 @@ function pushStatus(){
 }
 async function sync(r){
   if(!pushOn()){r.push='off';return}
-  const at=new Date(r.when).getTime();
-  if(at<=Date.now()){r.push='past';return}
-  try{const j=await api({op:'add',id:r.id,sub:getSub(),title:'Напоминание',body:r.text,at});r.push=j.ok?'ok':'err'}catch(e){r.push='err'}
+  const at=nextAt(r);
+  if(!at||at<=Date.now()){r.push='past';return}
+  try{
+    const o={op:'add',id:r.id,sub:getSub(),title:'Напоминание',body:r.text,at};
+    if(r.rep){o.rep='day';o.until=untilMs(r);o.tz=Intl.DateTimeFormat().resolvedOptions().timeZone;o.hm=hmOf(r.when)}
+    const j=await api(o);r.push=j.ok?'ok':'err';
+  }catch(e){r.push='err'}
 }
 async function unsync(r){if(r.push==='ok'&&cfg.url){try{await api({op:'del',id:r.id})}catch(e){}}}
 function pushSheet(){
@@ -83,18 +98,20 @@ function pushSheet(){
 let v='list',draft={files:[]};
 
 function vList(){
-  const up=R.items.filter(r=>!past(r)).sort((a,b)=>by(a).localeCompare(by(b)));
-  const ps=R.items.filter(past).sort((a,b)=>by(b).localeCompare(by(a)));
-  const it=r=>`<div class="ri${past(r)?' past':''}" data-id="${r.id}"><b>${esc(when(r.when))}</b>${r.media.length?`<span class="tag">файлов: ${r.media.length}</span>`:''}<div class="clip">${esc(r.text)}</div><button class="del" data-del="${r.id}">Удалить</button></div>`;
+  const up=R.items.filter(r=>!past(r)).sort((a,b)=>by(a)-by(b));
+  const ps=R.items.filter(past).sort((a,b)=>lastMs(b)-lastMs(a));
+  const it=r=>`<div class="ri${past(r)?' past':''}" data-id="${r.id}"><b>${esc(whenText(r))}</b>${r.media.length?`<span class="tag">файлов: ${r.media.length}</span>`:''}${r.rep&&nextAt(r)?`<div class="mute">Ближайшее: ${fdate(iso(new Date(nextAt(r))))}</div>`:''}<div class="clip">${esc(r.text)}</div><button class="del" data-del="${r.id}">Удалить</button></div>`;
   return '<button class="primary" data-a="new">+ Новое напоминание</button><button class="ghost" data-a="push">Уведомления: '+pushShort()+'</button>'
     +(up.length?'<h2>Предстоящие</h2>'+up.map(it).join(''):'')
-    +(ps.length?'<h2>История</h2>'+ps.map(it).join('')+'<button class="ghost" data-a="clr">Очистить историю</button>':'')
+    +(ps.length?'<h2>Архив</h2>'+ps.map(it).join('')+'<button class="ghost" data-a="clr">Очистить архив</button>':'')
     +(R.items.length?'':'<p class="mute">Напоминаний пока нет.</p>');
 }
 function vNew(){
   return `<button class="ghost" data-a="list">‹ Отмена</button><h1>Новое напоминание</h1>
   <label>Текст<textarea id="r_t" rows="4"></textarea></label>
   <div class="grid2"><label>Дата<input type="date" id="r_d"></label><label>Время<input type="time" id="r_h"></label></div>
+  <label class="ck"><input type="checkbox" id="r_rep"> Повторять каждый день в это время</label>
+  <label id="r_ul" hidden>Повторять до (можно оставить пустым: без конца)<input type="date" id="r_until"></label>
   <label class="sm up">+ Прикрепить фото и видео<input type="file" id="r_f" accept="image/*,video/*" multiple hidden></label>
   <div id="r_fl" class="mute" style="margin-bottom:12px"></div>
   <button class="primary" data-a="save">Сохранить</button>
@@ -120,7 +137,10 @@ async function remove(rs){
 async function save(){
   const text=$('#r_t').value.trim(),d=$('#r_d').value,h=$('#r_h').value;
   if(!text||!d||!h){toast('Нужны текст, дата и время');return}
-  const r={id:mdb.uid(),text,when:d+'T'+h,media:[]};let bad=0;
+  const rep=$('#r_rep').checked,until=rep?$('#r_until').value:'';
+  if(until&&until<d){toast('Дата окончания раньше даты начала');return}
+  const r={id:mdb.uid(),text,when:d+'T'+h,media:[]};if(rep){r.rep='day';r.until=until}
+  let bad=0;
   for(const f of draft.files){
     const id=mdb.uid();
     try{await mdb.mPut({id,blob:f});r.media.push({id,kind:f.type.startsWith('video')?'video':'photo',name:f.name||('media-'+id),type:f.type})}catch(e){bad++}
@@ -143,7 +163,7 @@ function cal(r){
   const end=iso(e).replace(/-/g,'')+'T'+pad(e.getHours())+pad(e.getMinutes())+'00';
   const now=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
   const title=r.text.split('\n')[0].slice(0,80);
-  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Moi Chasy//RU','CALSCALE:GREGORIAN','BEGIN:VEVENT','UID:'+r.id+'@moi-chasy','DTSTAMP:'+now,'DTSTART:'+s,'DTEND:'+end,'SUMMARY:'+q(title),'DESCRIPTION:'+q(r.text),'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+q(title),'TRIGGER:PT0S','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Moi Chasy//RU','CALSCALE:GREGORIAN','BEGIN:VEVENT','UID:'+r.id+'@moi-chasy','DTSTAMP:'+now,'DTSTART:'+s,'DTEND:'+end,...(r.rep?['RRULE:FREQ=DAILY'+(r.until?';UNTIL='+r.until.replace(/-/g,'')+'T'+t.replace(':','')+'00':'')]:[]),'SUMMARY:'+q(title),'DESCRIPTION:'+q(r.text),'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+q(title),'TRIGGER:PT0S','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
   const blob=new Blob([ics],{type:'text/calendar'});
   mdb.share(blob,'napominanie.ics','text/calendar',URL.createObjectURL(blob));
 }
@@ -152,7 +172,7 @@ function detail(r,fresh){
   const psText={ok:'Уведомление запланировано: оно придёт в это время.',err:'Не удалось запланировать уведомление на сервере.',off:'Уведомления не настроены, поэтому оповещения не будет.',past:'Время уже прошло, уведомление не планировалось.'}[r.push]||'Уведомление не запланировано.';
   const showPush=r.push!=='ok'&&r.push!=='past';
   const pLbl=pushOn()?(r.push==='err'?'Повторить':'Запланировать уведомление'):'Настроить уведомления';
-  openSheet(`<h2>${fresh?'Напоминание сохранено':'Напоминание'}</h2><b>${esc(when(r.when))}</b><p class="txt">${esc(r.text)}</p>
+  openSheet(`<h2>${fresh?'Напоминание сохранено':'Напоминание'}</h2><b>${esc(whenText(r))}</b><p class="txt">${esc(r.text)}</p>
   ${r.media.length?`<div class="gr">${r.media.map(thumb).join('')}</div>`:''}
   <p class="mute" style="margin-top:14px">${psText}</p>
   ${showPush?`<button class="primary" id="d_push">${pLbl}</button>`:''}
@@ -184,13 +204,18 @@ body.addEventListener('click',async e=>{
     else if(a==='save')save();
     else if(a==='push')pushSheet();
     else if(a==='clrf'){draft.files=[];flist()}
-    else if(a==='clr'){const ps=R.items.filter(past);if(ps.length&&confirm('Удалить всю историю ('+ps.length+' шт.) вместе с файлами?'))await remove(ps)}
+    else if(a==='clr'){const ps=R.items.filter(past);if(ps.length&&confirm('Удалить весь архив ('+ps.length+' шт.) вместе с файлами?'))await remove(ps)}
     return;
   }
   const it=e.target.closest('.ri');
   if(it){const r=R.items.find(x=>x.id===it.dataset.id);if(r)detail(r)}
 });
 body.addEventListener('change',e=>{
+  if(e.target.id==='r_rep'){
+    $('#r_ul').hidden=!e.target.checked;
+    if(e.target.checked&&!$('#r_until').value){const [y,m,dd]=$('#r_d').value.split('-').map(Number);if(y)$('#r_until').value=iso(new Date(y,m-1,dd+29))}
+    return;
+  }
   if(e.target.id==='r_f'){const fs=[...e.target.files];e.target.value='';draft.files.push(...fs);flist()}
 });
 })();

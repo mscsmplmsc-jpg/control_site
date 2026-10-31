@@ -63,7 +63,7 @@ function sweep(){
 
 /* отображение */
 function tcard(t,withProj){
-  const p=withProj&&proj(t.pid),all=t.subs,dn=all.filter(s=>s.done).length;
+  const p=withProj&&proj(t.pid),all=t.subs.filter(s=>!s.arch),dn=all.filter(s=>s.done).length;
   const undone=all.filter(s=>!s.done),shown=undone.slice(0,4),rest=undone.length-shown.length;
   const meta=[p?esc(p.name):'',t.due?`<span class="${over(t)?'od':''}">${fdate(t.due)}</span>`:'',t.prio?PR[t.prio]:'',all.length?`${dn}/${all.length}`:''].filter(Boolean).join(' · ');
   return `<div class="tc" data-a="task" data-id="${t.id}"><div class="tch"><b>${esc(t.title)}</b>${dot(t.color)}</div>
@@ -71,10 +71,10 @@ function tcard(t,withProj){
   ${all.length?`<div class="bar2"><i style="width:${Math.round(dn/all.length*100)}%"></i></div>`:''}
   ${shown.map(s=>`<label class="sb"><input type="checkbox" data-sub="${s.id}" data-t="${t.id}" aria-label="Выполнено"><span>${s.imp?'★ ':''}${esc(s.t)}</span></label>`).join('')}
   ${rest>0?`<div class="mute" style="margin-top:6px">и ещё ${rest}</div>`:''}
-  ${!all.length?'<div class="mute" style="margin-top:6px">Подзадач нет</div>':!undone.length?'<div class="mute" style="margin-top:6px">Все подзадачи выполнены</div>':''}</div>`;
+  ${!all.length?`<div class="mute" style="margin-top:6px">${t.subs.length?'Все подзадачи выполнены':'Подзадач нет'}</div>`:!undone.length?'<div class="mute" style="margin-top:6px">Все подзадачи выполнены</div>':''}</div>`;
 }
 function pcard(p){
-  const subs=T.tasks.filter(t=>t.pid===p.id).flatMap(t=>t.subs),dn=subs.filter(s=>s.done).length;
+  const subs=T.tasks.filter(t=>t.pid===p.id).flatMap(t=>t.subs.filter(s=>!s.arch)),dn=subs.filter(s=>s.done).length;
   return `<div class="pc" data-a="proj" data-id="${p.id}">${dot(p.color)}<div class="pi" style="flex:1"><b>${esc(p.name)}</b>${p.prio?`<span class="tag">${PR[p.prio]}</span>`:''}${p.tags.length?`<div class="mute">${p.tags.map(x=>'#'+esc(x)).join(' ')}</div>`:''}<div class="bar2"><i style="width:${subs.length?Math.round(dn/subs.length*100):0}%"></i></div><div class="mute">Подзадач выполнено ${dn} из ${subs.length}</div></div></div>`;
 }
 let F={},v={n:'home'};
@@ -100,7 +100,7 @@ function vHome(){
   <div id="t_res">${res()}</div>`;
 }
 function vProj(p){
-  const all=T.tasks.filter(t=>t.pid===p.id),subs=all.flatMap(t=>t.subs),dn=subs.filter(s=>s.done).length;
+  const all=T.tasks.filter(t=>t.pid===p.id),subs=all.flatMap(t=>t.subs.filter(s=>!s.arch)),dn=subs.filter(s=>s.done).length;
   let ts=all.filter(t=>!t.archived);
   if(F.st==='act')ts=ts.filter(t=>!complete(t));else if(F.st==='done')ts=ts.filter(complete);else if(F.st==='over')ts=ts.filter(over);
   if(F.pr)ts=ts.filter(t=>String(t.prio|0)===F.pr);
