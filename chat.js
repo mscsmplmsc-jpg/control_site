@@ -236,10 +236,7 @@ async function enablePush(){
   try{
     if(!('PushManager' in window)||!(navigator.standalone||matchMedia('(display-mode: standalone)').matches)){toast('Откройте приложение с иконки на экране «Домой»');return}
     if(await Notification.requestPermission()!=='granted'){toast('Уведомления запрещены в настройках iPhone');return}
-    const reg=await navigator.serviceWorker.ready;
-    let s=await reg.pushManager.getSubscription();
-    if(!s)s=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:unb64u(window.VAPID_PUB)});
-    localStorage.setItem('push-sub',JSON.stringify(s));
+    const s=await window.ensurePushSub();
     const j=await authCall({op:'subscribe',sub:s.toJSON()});
     toast(j.ok?'Уведомления о сообщениях включены':'Не удалось включить уведомления');
   }catch(e){toast('Ошибка: '+(e.message||e))}
