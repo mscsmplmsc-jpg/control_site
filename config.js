@@ -1,6 +1,5 @@
-// Адрес вашего сервера на Cloudflare (Worker).
-// Пока адрес пустой, приложение работает как раньше: без входа и без синхронизации.
-// После настройки впишите сюда адрес, например:
-// window.APP_API = 'https://moi-chasy-push.ваш-аккаунт.workers.dev';
-window.APP_API = 'https://moi-chasy-bo0wmn3c9-mscsmplmsc-jpg.vercel.app/api';
-
+// Адрес вашего сервера (Vercel). Заканчивается на /api
+// Нужен ОСНОВНОЙ адрес проекта (Vercel → проект → Overview → Domains),
+// а не длинный адрес конкретной сборки с набором букв и цифр.
+// Пока адрес пустой, приложение работает без входа и без синхронизации.
+window.APP_API = 'https://moi-chasy-api-omega.vercel.app/api';
