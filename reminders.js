@@ -42,14 +42,18 @@ const getSub=()=>{try{return JSON.parse(localStorage.getItem('push-sub'))}catch(
 const pushOk=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
 const standalone=()=>navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
 const unb64u=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return Uint8Array.from(atob(s),c=>c.charCodeAt(0))};
+const hasAcct=()=>!!(window.authUser&&authUser());
+const hasSrv=()=>hasAcct()||!!(cfg.url&&cfg.token);
 async function api(o){
+  if(hasAcct())return await authCall(o); // с аккаунтом адрес и секретный код не нужны
   const c=new AbortController(),tm=setTimeout(()=>c.abort(),15000);
   try{const r=await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({t:cfg.token,...o}),signal:c.signal});return await r.json()}
   finally{clearTimeout(tm)}
 }
-const pushOn=()=>!!(cfg.url&&cfg.token&&getSub()&&pushOk()&&Notification.permission==='granted');
+const pushOn=()=>!!(hasSrv()&&getSub()&&pushOk()&&Notification.permission==='granted');
 const pushShort=()=>pushOn()?'включены':'не настроены';
 function pushStatus(){
+  if(!hasSrv())return 'Войдите в аккаунт (кнопка «Аккаунт» в главном меню), чтобы получать уведомления.';
   if(!pushOk())return 'Этот браузер не поддерживает push-уведомления.';
   if(!standalone())return 'Откройте приложение с иконки на экране «Домой»: в обычном Safari уведомления на iPhone не работают.';
   if(Notification.permission==='denied')return 'Уведомления запрещены. Разрешите их в Настройки iPhone → Уведомления → Мои часы.';
@@ -65,7 +69,7 @@ async function sync(r){
     const j=await api(o);r.push=j.ok?'ok':'err';
   }catch(e){r.push='err'}
 }
-async function unsync(r){if(r.push==='ok'&&cfg.url){try{await api({op:'del',id:r.id})}catch(e){}}}
+async function unsync(r){if(r.push==='ok'&&hasSrv()){try{await api({op:'del',id:r.id})}catch(e){}}}
 window.ensurePushSub=async()=>{
   const reg=await navigator.serviceWorker.ready,want=unb64u(VAPID_PUB);
   let s=await reg.pushManager.getSubscription();
@@ -77,19 +81,19 @@ window.ensurePushSub=async()=>{
 };
 function pushSheet(){
   openSheet(`<h2>Уведомления</h2><p class="mute" id="p_st">${esc(pushStatus())}</p>
-  <label>Адрес сервера (Worker)<input id="p_u" value="${esc(cfg.url||'')}" placeholder="https://проект.vercel.app/api" autocapitalize="off" autocorrect="off"></label>
-  <label>Секретный код<input id="p_t" type="password" value="${esc(cfg.token||'')}" autocapitalize="off" autocorrect="off"></label>
-  <button class="primary" id="p_on">Сохранить и включить</button>
+  ${hasAcct()?'':`<label>Адрес сервера<input id="p_u" value="${esc(cfg.url||'')}" placeholder="https://проект.vercel.app/api" autocapitalize="off" autocorrect="off"></label>
+  <label>Секретный код<input id="p_t" type="password" value="${esc(cfg.token||'')}" autocapitalize="off" autocorrect="off"></label>`}
+  <button class="primary" id="p_on">Включить уведомления</button>
   <button class="ghost" id="p_test">Отправить тестовое уведомление</button>
   <div class="mute" id="p_msg"></div>
   <button class="ghost" id="p_x">Закрыть</button>`);
   const msg=t=>{$('#p_msg').textContent=t};
-  const store=()=>{const old=cfg.url;cfg={url:$('#p_u').value.trim(),token:$('#p_t').value.trim()};localStorage.setItem(PC,JSON.stringify(cfg));if(old&&old!==cfg.url){R.items.forEach(r=>{if(r.push==='ok')r.push='err'});sv()}};
+  const store=()=>{if(hasAcct())return;const old=cfg.url;cfg={url:$('#p_u').value.trim(),token:$('#p_t').value.trim()};localStorage.setItem(PC,JSON.stringify(cfg));if(old&&old!==cfg.url){R.items.forEach(r=>{if(r.push==='ok')r.push='err'});sv()}};
   window._sc=()=>show();
   $('#p_x').onclick=closeSheet;
   $('#p_on').onclick=async()=>{
     store();
-    if(!cfg.url||!cfg.token){msg('Заполните адрес сервера и секретный код.');return}
+    if(!hasSrv()){msg(pushStatus());return}
     if(!pushOk()||!standalone()){msg(pushStatus());return}
     try{
       if(await Notification.requestPermission()!=='granted'){msg(pushStatus());return}
@@ -99,7 +103,7 @@ function pushSheet(){
   };
   $('#p_test').onclick=async()=>{
     store();
-    if(!getSub()){msg('Сначала нажмите «Сохранить и включить».');return}
+    if(!getSub()){msg('Сначала нажмите «Включить уведомления».');return}
     msg('Отправляю…');
     try{const j=await api({op:'test',sub:getSub()});msg(j.ok?'Отправлено. Уведомление придёт через несколько секунд.':'Сервер ответил: '+(j.error||j.status)+' '+(j.detail||''))}
     catch(e){msg('Не удалось связаться с сервером, проверьте адрес. ('+(e&&e.message||e)+')')}
@@ -160,13 +164,13 @@ async function save(){
     const id=mdb.uid();
     try{await mdb.mPut({id,blob:f});r.media.push({id,kind:f.type.startsWith('video')?'video':'photo',name:f.name||('media-'+id),type:f.type})}catch(e){bad++}
   }
-  r.push=cfg.url?'wait':'off';
+  r.push=hasSrv()?'wait':'off';
   R.items.push(r);
   if(!sv()){R.items.pop();saving=false;if(sb){sb.disabled=false;sb.textContent='Сохранить'}return}
   v='list';draft={files:[]};saving=false;show();
   if(bad)toast('Не удалось сохранить файлов: '+bad);
   detail(r,true);
-  if(cfg.url)bgSync(r); // отправка на сервер идёт в фоне, окно не ждёт
+  if(hasSrv())bgSync(r); // отправка на сервер идёт в фоне, окно не ждёт
 }
 async function bgSync(r){
   await sync(r);sv();
