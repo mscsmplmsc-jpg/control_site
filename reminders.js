@@ -66,8 +66,8 @@ async function sync(r){
   try{
     const o={op:'add',id:r.id,sub:getSub(),title:'Напоминание',body:r.text,at};
     if(r.rep){o.rep='day';o.until=untilMs(r);o.tz=Intl.DateTimeFormat().resolvedOptions().timeZone;o.hm=hmOf(r.when)}
-    const j=await api(o);r.push=j.ok?'ok':'err';
-  }catch(e){r.push='err'}
+    const j=await api(o);r.push=j.ok?'ok':'err';r.perr=j.ok?'':(j.error||('код '+(j._s||'?')));
+  }catch(e){r.push='err';r.perr=e&&e.name==='AbortError'?'сервер не ответил вовремя':String(e&&e.message||e)}
 }
 async function unsync(r){if(r.push==='ok'&&hasSrv()){try{await api({op:'del',id:r.id})}catch(e){}}}
 window.ensurePushSub=async()=>{
@@ -194,7 +194,7 @@ function cal(r){
 }
 
 function detail(r,fresh){
-  const psText={wait:'Отправляю уведомление на сервер…',ok:'Уведомление запланировано: оно придёт в это время.',err:'Не удалось запланировать уведомление на сервере.',off:'Уведомления не настроены, поэтому оповещения не будет.',past:'Время уже прошло, уведомление не планировалось.'}[r.push]||'Уведомление не запланировано.';
+  const psText={wait:'Отправляю уведомление на сервер…',ok:'Уведомление запланировано: оно придёт в это время.',err:'Не удалось запланировать уведомление на сервере.'+(r.perr?' Причина: '+esc(r.perr):''),off:'Уведомления не настроены, поэтому оповещения не будет.',past:'Время уже прошло, уведомление не планировалось.'}[r.push]||'Уведомление не запланировано.';
   const showPush=r.push!=='ok'&&r.push!=='past'&&r.push!=='wait';
   const pLbl=pushOn()?(r.push==='err'?'Повторить':'Запланировать уведомление'):'Настроить уведомления';
   openSheet(`<h2>${fresh?'Напоминание сохранено':'Напоминание'}</h2><b>${esc(whenText(r))}</b><p class="txt">${esc(r.text)}</p>
