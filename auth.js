@@ -165,7 +165,7 @@ async function logout(){
   if(!ok&&!confirm('Последние изменения не удалось отправить на сервер, они будут потеряны. Всё равно выйти?')){busy=false;return}
   let ep='';try{ep=JSON.parse(localStorage.getItem('push-sub')).endpoint}catch(e){}
   try{await sc({op:'logout',ep})}catch(e){}
-  Object.values(LOC).concat(['feat-v1','locks-v1','push-sub','chat-peers-v1','chat-seen-v1','chat-files-v1',SK,RK]).forEach(k=>localStorage.removeItem(k));
+  Object.values(LOC).concat(['feat-v1','locks-v1','push-sub','chat-peers-v1','chat-seen-v1','chat-files-v1','store-v1',SK,RK]).forEach(k=>localStorage.removeItem(k));
   const r=indexedDB.open('crm-media',1);
   r.onupgradeneeded=()=>r.result.createObjectStore('m',{keyPath:'id'});
   r.onsuccess=()=>{const t=r.result.transaction('m','readwrite');t.objectStore('m').clear();t.oncomplete=()=>location.reload()};

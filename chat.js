@@ -13,6 +13,7 @@ st.textContent=`
 .mg.he{background:var(--card);border:1px solid var(--line)}
 .mg img,.mg video{max-width:100%;max-height:50vh;border-radius:8px;display:block}
 .mt{font-size:11px;opacity:.7;margin-top:2px}
+.dsep{text-align:center;color:var(--mute);font-size:13px;margin:16px 0 6px}
 `;
 document.head.appendChild(st);
 
@@ -95,9 +96,16 @@ async function renderMsgs(first){
   }
   files.filter(f=>f.peer===peer).forEach(f=>items.push({ts:f.ts,html:fileHtml(f)}));
   items.sort((a,b)=>a.ts-b.ts);
+  const now=Date.now(),td=iso(new Date(now)),yd=iso(new Date(now-864e5));
+  let html='',lastDay='';
+  for(const i of items){
+    const day=iso(new Date(i.ts));
+    if(day!==lastDay){lastDay=day;html+=`<div class="dsep">${day===td?'Сегодня':day===yd?'Вчера':fdate(day)}</div>`}
+    html+=i.html;
+  }
   if(v.peer!==peer||!$('#c_msgs'))return;
   const near=window.innerHeight+window.scrollY>=document.body.scrollHeight-100;
-  el.innerHTML=items.map(i=>i.html).join('')||'<p class="mute">Сообщений пока нет.</p>';
+  el.innerHTML=html||'<p class="mute">Сообщений пока нет.</p>';
   hy(el);
   if(first||near)window.scrollTo(0,document.body.scrollHeight);
 }
