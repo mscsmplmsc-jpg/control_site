@@ -1,6 +1,8 @@
 (()=>{
-const API=String(window.APP_API||'').trim().replace(/\/+$/,'');
-if(!/^https?:\/\//.test(API))return; // сервер не настроен: приложение работает как раньше
+// Адрес сервера может быть один или список: приложение пробует их по очереди и запоминает рабочий
+const APIS=[].concat(window.APP_API||[]).map(x=>String(x).trim().replace(/\/+$/,'')).filter(x=>/^https?:\/\//.test(x));
+if(!APIS.length)return; // сервер не настроен: приложение работает как раньше
+let apiI=Math.min(Number(localStorage.getItem('api-i'))||0,APIS.length-1);
 
 const st=document.createElement('style');
 st.textContent='#auth{position:fixed;inset:0;z-index:40;background:var(--bg);overflow:auto;padding:env(safe-area-inset-top) 16px}.ag{max-width:420px;margin:12vh auto 0}.dv{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}';
@@ -24,12 +26,20 @@ function setLoc(k,s){
 const isEmpty=(k,s)=>k==='meta'?(!s||s===EMPTY_META):!s;
 
 async function call(o){
-  const c=new AbortController(),tm=setTimeout(()=>c.abort(),20000);
-  try{
-    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(o),signal:c.signal});
-    let j={};try{j=await r.json()}catch(e){}
-    j._s=r.status;return j;
-  }finally{clearTimeout(tm)}
+  let last=null;
+  for(let n=0;n<APIS.length;n++){
+    const i=(apiI+n)%APIS.length,c=new AbortController(),tm=setTimeout(()=>c.abort(),APIS.length>1?10000:20000);
+    try{
+      const r=await fetch(APIS[i],{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(o),signal:c.signal});
+      if(APIS.length>1&&r.status>=502&&r.status<=504){last=new Error('http '+r.status);continue}
+      let j={};try{j=await r.json()}catch(e){}
+      j._s=r.status;
+      if(i!==apiI){apiI=i;localStorage.setItem('api-i',String(i))}
+      return j;
+    }catch(e){last=e}
+    finally{clearTimeout(tm)}
+  }
+  throw last||new Error('нет связи');
 }
 const sc=o=>call({s:sess&&sess.t,...o});
 window.authCall=o=>sc(o);
@@ -109,10 +119,14 @@ function gate(msg){
   $('#a_in').onclick=()=>login('login');$('#a_up').onclick=()=>login('reg');
   $('#a_ping').onclick=async()=>{
     const el=$('#a_e');el.textContent='Проверяю связь…';
-    const t0=Date.now(),c=new AbortController(),tm=setTimeout(()=>c.abort(),15000);
-    try{const r=await fetch(API,{cache:'no-store',signal:c.signal});const j=await r.json();el.textContent=j&&j.ok?'Сервер отвечает ('+(Date.now()-t0)+' мс).':'Сервер ответил странно (код '+r.status+').'}
-    catch(e){el.textContent='Сервер не отвечает за 15 секунд. Возможно, соединение с ним блокирует провайдер или сеть. Попробуйте Wi-Fi или другой интернет.'}
-    finally{clearTimeout(tm)}
+    const out=[];let okAny=false;
+    for(const u of APIS){
+      const t0=Date.now(),c=new AbortController(),tm=setTimeout(()=>c.abort(),10000),host=u.replace(/^https?:\/\//,'').split('/')[0];
+      try{const r=await fetch(u,{cache:'no-store',signal:c.signal});const j=await r.json();if(j&&j.ok){okAny=true;out.push(host+': отвечает ('+(Date.now()-t0)+' мс)')}else out.push(host+': странный ответ, код '+r.status)}
+      catch(e){out.push(host+': не отвечает')}
+      finally{clearTimeout(tm)}
+    }
+    el.innerHTML=out.map(esc).join('<br>')+(okAny?'':'<br>Сервер недоступен. Возможно, соединение с ним блокирует провайдер или сеть. Попробуйте Wi-Fi или другой интернет.');
   };
   $('#a_skip').onclick=()=>{localStorage.setItem('auth-skip','1');$('#auth').hidden=true};
   $('#a_p').onkeydown=e=>{if(e.key==='Enter')login('login')};

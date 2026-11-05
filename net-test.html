@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Проверка доступности серверов</title>
+<style>
+body{font:17px/1.45 -apple-system,system-ui,sans-serif;margin:0;padding:18px;background:#f1f2ee;color:#1b2b33;max-width:640px}
+h1{font-size:22px;margin:0 0 6px}p{color:#667780;font-size:14px;margin:0 0 14px}
+button{font:inherit;padding:13px 18px;border:0;border-radius:12px;background:#1f5f5b;color:#fff;font-weight:600;width:100%}
+.r{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #d9ddd6}
+.ok{color:#2a7a3a;font-weight:600}.no{color:#a83232;font-weight:600}.w{color:#667780}
+</style>
+</head>
+<body>
+<h1>Проверка доступности</h1>
+<p>Откройте эту страницу на телефоне пользователя из России без VPN, нажмите кнопку и пришлите скриншот результата. «Доступен» означает, что соединение установилось. «Нет» может также означать, что такого адреса не существует, поэтому главное для нас те, где написано «Доступен».</p>
+<button id="go">Проверить</button>
+<div id="out" style="margin-top:14px"></div>
+<script>
+const T=[
+ ['Наш сервер (Vercel)','https://moi-chasy-api-omega.vercel.app/api'],
+ ['Vercel (любой адрес)','https://moi-test-12345.vercel.app'],
+ ['Netlify','https://moi-test-12345.netlify.app'],
+ ['Render','https://moi-test-12345.onrender.com'],
+ ['Deno Deploy','https://moi-test-12345.deno.dev'],
+ ['Koyeb','https://moi-test-12345.koyeb.app'],
+ ['Fly.io','https://moi-test-12345.fly.dev'],
+ ['Railway','https://moi-test-12345.up.railway.app'],
+ ['Firebase','https://moi-test-12345.web.app'],
+ ['Supabase','https://moi-test-12345.supabase.co'],
+ ['Cloudflare Workers','https://moi-test-12345.workers.dev'],
+ ['Cloudflare Pages','https://moi-test-12345.pages.dev'],
+ ['GitHub (API)','https://api.github.com'],
+ ['GitHub Pages','https://pages.github.com'],
+];
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+async function probe(u){
+  const t0=Date.now(),c=new AbortController(),tm=setTimeout(()=>c.abort(),8000);
+  try{await fetch(u,{mode:'no-cors',cache:'no-store',signal:c.signal});return {ok:true,ms:Date.now()-t0}}
+  catch(e){return {ok:false,ms:Date.now()-t0}}
+  finally{clearTimeout(tm)}
+}
+document.getElementById('go').onclick=async()=>{
+  const out=document.getElementById('out');
+  out.innerHTML=T.map((t,i)=>`<div class="r" id="r${i}"><span>${esc(t[0])}</span><span class="w">ждём…</span></div>`).join('');
+  await Promise.all(T.map(async(t,i)=>{
+    const r=await probe(t[1]);
+    document.getElementById('r'+i).lastChild.outerHTML=r.ok?`<span class="ok">Доступен · ${r.ms} мс</span>`:'<span class="no">Нет</span>';
+  }));
+  out.insertAdjacentHTML('beforeend','<p style="margin-top:12px">Готово. Сделайте скриншот.</p>');
+};
+</script>
+</body>
+</html>
