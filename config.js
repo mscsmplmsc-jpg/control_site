@@ -4,4 +4,4 @@
 // Можно указать несколько серверов списком: приложение попробует их по очереди и запомнит рабочий.
 // Пример: window.APP_API = ['https://moi-chasy-api-omega.vercel.app/api', 'https://второй-сервер.example/api'];
 // Пока адрес пустой, приложение работает без входа и без синхронизации.
-window.APP_API = 'https://moi-chasy-api-omega.vercel.app/api';
+window.APP_API = ['https://moi-chasy-api-omega.vercel.app/api', 'https://joyful-unicorn-5ca6be.netlify.app/api?check=1'];
