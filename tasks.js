@@ -20,6 +20,8 @@ st.textContent=`
 .sw.on{border-color:var(--ink);box-shadow:inset 0 0 0 2px var(--bg)}
 .lg{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .lg input{margin:0}
+.sb.note{cursor:pointer;color:var(--ink)}
+.txt{overflow-wrap:anywhere}
 `;
 document.head.appendChild(st);
 
@@ -44,8 +46,8 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const today=()=>iso(new Date());
 const proj=id=>T.projects.find(p=>p.id===id);
 const task=id=>T.tasks.find(t=>t.id===id);
-const complete=t=>t.subs.length>0&&t.subs.every(s=>s.done);
-const over=t=>!!t.due&&t.due<today()&&!complete(t);
+const complete=t=>!t.note&&t.subs.length>0&&t.subs.every(s=>s.done);
+const over=t=>!t.note&&!!t.due&&t.due<today()&&!complete(t);
 const cname=c=>(COLORS.find(x=>x[0]===c)||[0,''])[1];
 const dot=c=>c?`<span class="dot" style="background:${esc(c)}"></span>`:'';
 const cdate=ts=>{const d=new Date(ts);return fdate(iso(d))+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
@@ -62,7 +64,15 @@ function sweep(){
 }
 
 /* отображение */
+const linkify=s=>esc(s).replace(/https?:\/\/[^\s<]+/g,m=>{const t=(m.match(/[.,;:!?)]+$/)||[''])[0],u=t?m.slice(0,-t.length):m;return `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>${t}`});
+function ncard(t,withProj){
+  const p=withProj&&proj(t.pid),subs=t.subs,shown=subs.slice(0,4),rest=subs.length-shown.length;
+  return `<div class="tc" data-a="task" data-id="${t.id}"><div class="tch"><b>${esc(t.title)}</b>${dot(t.color)}</div><div class="mute">${p?esc(p.name)+' · ':''}заметки</div>
+  ${shown.map(s=>`<div class="sb note" data-a="subopen" data-t="${t.id}" data-id="${s.id}"><span>📝 ${esc(s.t)}</span>${(s.cm||[]).length?`<span class="mute">· 💬${s.cm.length}</span>`:''}</div>`).join('')}
+  ${rest>0?`<div class="mute" style="margin-top:6px">и ещё ${rest}</div>`:''}${!subs.length?'<div class="mute" style="margin-top:6px">Пока пусто</div>':''}</div>`;
+}
 function tcard(t,withProj){
+  if(t.note)return ncard(t,withProj);
   const p=withProj&&proj(t.pid),all=t.subs.filter(s=>!s.arch),dn=all.filter(s=>s.done).length;
   const undone=all.filter(s=>!s.done),shown=undone.slice(0,4),rest=undone.length-shown.length;
   const meta=[p?esc(p.name):'',t.due?`<span class="${over(t)?'od':''}">${fdate(t.due)}</span>`:'',t.prio?PR[t.prio]:'',all.length?`${dn}/${all.length}`:''].filter(Boolean).join(' · ');
@@ -74,17 +84,17 @@ function tcard(t,withProj){
   ${!all.length?`<div class="mute" style="margin-top:6px">${t.subs.length?'Все подзадачи выполнены':'Подзадач нет'}</div>`:!undone.length?'<div class="mute" style="margin-top:6px">Все подзадачи выполнены</div>':''}</div>`;
 }
 function pcard(p){
-  const subs=T.tasks.filter(t=>t.pid===p.id).flatMap(t=>t.subs.filter(s=>!s.arch)),dn=subs.filter(s=>s.done).length;
+  const subs=T.tasks.filter(t=>t.pid===p.id&&!t.note).flatMap(t=>t.subs.filter(s=>!s.arch)),dn=subs.filter(s=>s.done).length;
   return `<div class="pc" data-a="proj" data-id="${p.id}">${dot(p.color)}<div class="pi" style="flex:1"><b>${esc(p.name)}</b>${p.prio?`<span class="tag">${PR[p.prio]}</span>`:''}${p.tags.length?`<div class="mute">${p.tags.map(x=>'#'+esc(x)).join(' ')}</div>`:''}<div class="bar2"><i style="width:${subs.length?Math.round(dn/subs.length*100):0}%"></i></div><div class="mute">Подзадач выполнено ${dn} из ${subs.length}</div></div></div>`;
 }
 let F={},v={n:'home'};
-const todayList=()=>T.tasks.filter(t=>!t.archived&&!complete(t)&&t.due&&t.due<=today());
-const impList=()=>{const r=[];T.tasks.forEach(t=>{if(!t.archived)t.subs.forEach(s=>{if(s.imp&&!s.done)r.push([t,s])})});return r};
+const todayList=()=>T.tasks.filter(t=>!t.archived&&!t.note&&!complete(t)&&t.due&&t.due<=today());
+const impList=()=>{const r=[];T.tasks.forEach(t=>{if(!t.archived&&!t.note)t.subs.forEach(s=>{if(s.imp&&!s.done)r.push([t,s])})});return r};
 
 function res(){
   const q=(F.q||'').trim().toLowerCase();
   if(q){
-    const m=T.tasks.filter(t=>!t.archived&&(t.title+' '+(t.desc||'')+' '+t.subs.map(s=>s.t).join(' ')+' '+t.comments.map(c=>c.text).join(' ')).toLowerCase().includes(q));
+    const m=T.tasks.filter(t=>!t.archived&&(t.title+' '+(t.desc||'')+' '+t.subs.map(s=>s.t+' '+(s.body||'')+' '+(s.cm||[]).map(c=>c.text).join(' ')).join(' ')+' '+t.comments.map(c=>c.text).join(' ')).toLowerCase().includes(q));
     return m.length?m.sort(sortT).map(t=>tcard(t,1)).join(''):'<p class="mute">Ничего не найдено.</p>';
   }
   const ps=T.projects.filter(p=>!F.tag||p.tags.includes(F.tag)).sort((a,b)=>(b.prio|0)-(a.prio|0)||a.name.localeCompare(b.name,'ru'));
@@ -100,7 +110,7 @@ function vHome(){
   <div id="t_res">${res()}</div>`;
 }
 function vProj(p){
-  const all=T.tasks.filter(t=>t.pid===p.id),subs=all.flatMap(t=>t.subs.filter(s=>!s.arch)),dn=subs.filter(s=>s.done).length;
+  const all=T.tasks.filter(t=>t.pid===p.id),subs=all.filter(t=>!t.note).flatMap(t=>t.subs.filter(s=>!s.arch)),dn=subs.filter(s=>s.done).length;
   let ts=all.filter(t=>!t.archived);
   if(F.st==='act')ts=ts.filter(t=>!complete(t));else if(F.st==='done')ts=ts.filter(complete);else if(F.st==='over')ts=ts.filter(over);
   if(F.pr)ts=ts.filter(t=>String(t.prio|0)===F.pr);
@@ -119,20 +129,21 @@ function vProj(p){
 }
 function vTask(t){
   const p=proj(t.pid),act=t.subs.filter(s=>!s.done),dn=t.subs.filter(s=>s.done&&!s.arch),ar=t.subs.filter(s=>s.arch).length;
-  const sr=s=>`<label class="ck"><input type="checkbox" data-sub="${s.id}" data-t="${t.id}" ${s.done?'checked':''}><span style="flex:1${s.done?';text-decoration:line-through;color:var(--mute)':''}">${esc(s.t)}</span><button type="button" class="st" data-a="imp" data-id="${s.id}" aria-label="Важно">${s.imp?'★':'☆'}</button><button type="button" class="del" data-a="delsub" data-id="${s.id}" style="padding:0">×</button></label>`;
+  const nr=s=>`<div class="tc" data-a="subopen" data-t="${t.id}" data-id="${s.id}"><b>${esc(s.t)}</b>${s.body?`<div class="clip">${esc(s.body)}</div>`:''}${(s.cm||[]).length?`<div class="mute">Комментариев: ${s.cm.length}</div>`:''}</div>`;
+  const sr=s=>`<label class="ck"><input type="checkbox" data-sub="${s.id}" data-t="${t.id}" ${s.done?'checked':''}><span style="flex:1${s.done?';text-decoration:line-through;color:var(--mute)':''}">${esc(s.t)}</span><button type="button" class="st" data-a="subopen" data-t="${t.id}" data-id="${s.id}" aria-label="Комментарии" style="font-size:15px">💬${(s.cm||[]).length||''}</button><button type="button" class="st" data-a="imp" data-id="${s.id}" aria-label="Важно">${s.imp?'★':'☆'}</button><button type="button" class="del" data-a="delsub" data-id="${s.id}" style="padding:0">×</button></label>`;
   return `<div class="nav"><button class="ghost" data-a="proj" data-id="${t.pid}">‹ ${esc(p?p.name:'Проект')}</button><button class="ghost" data-a="editt">Изменить</button><button class="ghost" data-a="toarch">В архив</button><button class="ghost bad" data-a="delt">Удалить</button></div>
   <div class="hd" style="margin:4px 0 8px">${dot(t.color)}<h1 style="margin:0">${esc(t.title)}</h1></div>
   <div class="inf"><span>Срок</span><span class="${over(t)?'od':''}">${t.due?fdate(t.due):'не задан'}</span></div>
   <div class="inf"><span>Приоритет</span><span>${PR[t.prio|0]}</span></div>
   ${t.color?`<div class="inf"><span>Цвет</span><span>${dot(t.color)} ${esc(T.legend[t.color]||cname(t.color))}</span></div>`:''}
-  ${t.desc?`<h2>Описание</h2><p class="txt">${esc(t.desc)}</p>`:''}
-  <h2>Подзадачи</h2>
+  ${t.desc?`<h2>Описание</h2><p class="txt">${linkify(t.desc)}</p>`:''}
+  <h2>${t.note?'Заметки':'Подзадачи'}</h2>
   ${complete(t)?'<p class="mute">Все подзадачи выполнены. Задачу можно отправить в архив кнопкой вверху.</p>':''}
-  ${act.map(sr).join('')}${dn.map(sr).join('')}
+  ${t.note?t.subs.map(nr).join(''):act.map(sr).join('')+dn.map(sr).join('')}
   ${ar?`<div class="mute" style="margin-top:6px">В архиве подзадач: ${ar}</div>`:''}
-  <div class="row" style="grid-template-columns:1fr auto;margin-top:10px"><input id="s_new" placeholder="Новая подзадача"><button class="sm" data-a="addsub" style="margin:0">+</button></div>
+  ${t.note?`<input id="s_new" placeholder="Заголовок заметки" style="margin-top:10px"><textarea id="s_body" rows="4" placeholder="Текст, ссылки и любая информация" style="margin-top:8px"></textarea><button class="ghost" data-a="addsub">Добавить заметку</button>`:`<div class="row" style="grid-template-columns:1fr auto;margin-top:10px"><input id="s_new" placeholder="Новая подзадача"><button class="sm" data-a="addsub" style="margin:0">+</button></div>`}
   <h2>Комментарии</h2>
-  ${t.comments.map(c=>`<div class="day"><div class="dh"><span class="mute">${cdate(c.ts)}</span><button class="del" data-a="delcm" data-id="${c.id}" style="padding:0">Удалить</button></div><div class="txt">${esc(c.text)}</div></div>`).join('')}
+  ${t.comments.map(c=>`<div class="day"><div class="dh"><span class="mute">${cdate(c.ts)}</span><button class="del" data-a="delcm" data-id="${c.id}" style="padding:0">Удалить</button></div><div class="txt">${linkify(c.text)}</div></div>`).join('')}
   <textarea id="c_new" rows="2" placeholder="Комментарий" style="margin-top:10px"></textarea><button class="ghost" data-a="addcm">Добавить комментарий</button>`;
 }
 function vToday(){
@@ -197,7 +208,8 @@ function taskSheet(t,pid){
   openSheet(`<h2>${t?'Задача':'Новая задача'}</h2>
   <label>Название<input id="tk_n" value="${esc(t?t.title:'')}"></label>
   <label>Описание<textarea id="tk_d" rows="3">${esc(t?t.desc||'':'')}</textarea></label>
-  <div class="grid2"><label>Срок<input type="date" id="tk_due" value="${t?t.due||'':''}"></label>
+  <label class="ck"><input type="checkbox" id="tk_note" ${t&&t.note?'checked':''}> Не требует выполнения (заметки)</label>
+  <div class="grid2" id="tk_g"${t&&t.note?' hidden':''}><label>Срок<input type="date" id="tk_due" value="${t?t.due||'':''}"></label>
   <label>Приоритет<select id="tk_p">${opts([[3,'Высокий'],[2,'Средний'],[1,'Низкий'],[0,'Без приоритета']],t?t.prio|0:0)}</select></label></div>
   <label>Проект<select id="tk_pr">${T.projects.map(p=>`<option value="${p.id}"${p.id===(t?t.pid:pid)?' selected':''}>${esc(p.name)}</option>`).join('')}</select></label>
   <div class="lbl">Цвет</div>${swatches(col)}
@@ -205,9 +217,11 @@ function taskSheet(t,pid){
   swLbl(col);
   $('#sheet').onclick=e=>{col=pick(e,col)};
   $('#tk_c').onclick=closeSheet;
+  $('#sheet').onchange=e=>{if(e.target.id==='tk_note')$('#tk_g').hidden=e.target.checked};
   $('#tk_s').onclick=()=>{
     const title=$('#tk_n').value.trim();if(!title){toast('Укажите название');return}
-    const o={title,desc:$('#tk_d').value.trim(),due:$('#tk_due').value,prio:+$('#tk_p').value,pid:$('#tk_pr').value,color:col};
+    const note=$('#tk_note').checked;
+    const o={title,desc:$('#tk_d').value.trim(),due:note?'':$('#tk_due').value,prio:+$('#tk_p').value,pid:$('#tk_pr').value,color:col,note};
     if(t)Object.assign(t,o);else{t={id:uid(),archived:false,subs:[],comments:[],created:Date.now(),...o};T.tasks.push(t)}
     sv();closeSheet();v=v.n==='task'?{n:'task',id:t.id}:{n:'proj',id:t.pid};show();
   };
@@ -222,9 +236,34 @@ function legendSheet(){
 }
 document.addEventListener('click',e=>{if(e.target.closest('[data-tmap]'))legendSheet()});
 
+/* подзадача или заметка: полный текст и свои комментарии */
+function subSheet(tid,sid,editing){
+  const t=task(tid),s=t&&t.subs.find(x=>x.id===sid);if(!s)return;
+  s.cm=s.cm||[];const note=!!t.note;
+  const head=editing
+    ?`<h2>${note?'Заметка':'Подзадача'}</h2><label>Заголовок<input id="sb_t" value="${esc(s.t)}"></label>${note?`<label>Текст<textarea id="sb_b" rows="8">${esc(s.body||'')}</textarea></label>`:''}<button class="primary" id="sb_sv">Сохранить</button>`
+    :`<h2>${esc(s.t)}</h2>${note?`<div class="txt">${s.body?linkify(s.body):'<span class="mute">Текст не добавлен</span>'}</div>`:''}<div class="acts" style="margin-top:10px">${note?'<button class="sm" id="sb_cp">Копировать текст</button>':''}<button class="sm" id="sb_ed">Изменить</button></div>`;
+  openSheet(`${head}<h2>Комментарии</h2>${s.cm.map(c=>`<div class="day"><div class="dh"><span class="mute">${cdate(c.ts)}</span><button class="del" data-cd="${c.id}" style="padding:0">Удалить</button></div><div class="txt">${linkify(c.text)}</div></div>`).join('')}
+  <textarea id="sc_new" rows="2" placeholder="Комментарий" style="margin-top:10px"></textarea><button class="ghost" id="sc_add">Добавить комментарий</button>
+  <button class="ghost" id="sb_del" style="color:var(--bad)">Удалить ${note?'заметку':'подзадачу'}</button><button class="ghost" id="sb_x">Закрыть</button>`);
+  window._sc=()=>show(true);
+  const again=ed=>subSheet(tid,sid,ed);
+  $('#sb_x').onclick=closeSheet;
+  $('#sc_add').onclick=()=>{const v=$('#sc_new').value.trim();if(!v)return;s.cm.push({id:uid(),ts:Date.now(),text:v});sv();again(editing)};
+  $('#sheet').onclick=e=>{const b=e.target.closest('[data-cd]');if(b&&confirm('Удалить комментарий?')){s.cm=s.cm.filter(c=>c.id!==b.dataset.cd);sv();again(editing)}};
+  $('#sb_del').onclick=()=>{if(!confirm('Удалить «'+s.t+'»?'))return;t.subs=t.subs.filter(x=>x!==s);sv();closeSheet()};
+  if(editing)$('#sb_sv').onclick=()=>{const v=$('#sb_t').value.trim();if(!v){toast('Введите заголовок');return}s.t=v;if(note)s.body=$('#sb_b').value.trim();sv();again(false)};
+  else{
+    $('#sb_ed').onclick=()=>again(true);
+    const c=$('#sb_cp');
+    if(c)c.onclick=async()=>{try{await navigator.clipboard.writeText(s.body||s.t);toast('Скопировано')}catch(e){toast('Не удалось скопировать, выделите текст пальцем')}};
+  }
+}
+
 /* действия */
 const body=$('#tskbody');
 body.addEventListener('click',e=>{
+  const so=e.target.closest('[data-a="subopen"]');if(so){subSheet(so.dataset.t,so.dataset.id);return}
   if(e.target.closest('[data-sub],.sb'))return;
   const b=e.target.closest('[data-a]');if(!b)return;
   const a=b.dataset.a,id=b.dataset.id,t=v.n==='task'?task(v.id):null,p=v.n==='proj'?proj(v.id):null;
@@ -246,7 +285,7 @@ body.addEventListener('click',e=>{
   else if(a==='unsub'){const [,s]=pair();if(s){s.arch=false;s.done=false;s.doneAt=null;sv();show(true)}}
   else if(a==='rmsub'){const [x,s]=pair();if(s&&confirm('Удалить подзадачу навсегда?')){x.subs=x.subs.filter(q=>q!==s);sv();show(true)}}
   else if(a==='clrarch'){if(confirm('Удалить всё из архива навсегда?')){T.tasks=T.tasks.filter(x=>!x.archived);T.tasks.forEach(x=>{x.subs=x.subs.filter(s=>!s.arch)});sv();show(true)}}
-  else if(a==='addsub'&&t){const s=$('#s_new').value.trim();if(s){t.subs.push({id:uid(),t:s,done:false,doneAt:null,imp:false,arch:false});sv();show(true)}}
+  else if(a==='addsub'&&t){const s=$('#s_new').value.trim(),bd=t.note&&$('#s_body')?$('#s_body').value.trim():'';if(s||bd){t.subs.push({id:uid(),t:s||bd.split('\n')[0].slice(0,60),body:bd,cm:[],done:false,doneAt:null,imp:false,arch:false});sv();show(true)}}
   else if(a==='imp'&&t){const s=t.subs.find(q=>q.id===id);if(s){s.imp=!s.imp;sv();show(true)}}
   else if(a==='delsub'&&t){t.subs=t.subs.filter(s=>s.id!==id);sv();show(true)}
   else if(a==='addcm'&&t){const s=$('#c_new').value.trim();if(s){t.comments.push({id:uid(),ts:Date.now(),text:s});sv();show(true)}}

@@ -9,9 +9,9 @@ st.textContent='#auth{position:fixed;inset:0;z-index:40;background:var(--bg);ove
 document.head.appendChild(st);
 
 const SK='sess-v1',RK='sync-rev-v1';
-const LOC={hours:'uchet-chasov-v1',crm:'crm-v1',rem:'rem-v1',tsk:'tasks-v1'};
-const KEYS=['hours','crm','rem','tsk','meta'];
-const NAMES={hours:'Учет часов',crm:'CRM',rem:'Напоминания',tsk:'Задачи',meta:'Пароли и коды'};
+const LOC={hours:'uchet-chasov-v1',crm:'crm-v1',rem:'rem-v1',tsk:'tasks-v1',money:'money-v1',sched:'sched-v1'};
+const KEYS=['hours','crm','rem','tsk','meta','money','sched'];
+const NAMES={hours:'Учет часов',crm:'CRM',rem:'Напоминания',tsk:'Задачи',meta:'Пароли и коды',money:'Денежные потоки',sched:'Расписание'};
 const META=[['feat','feat-v1'],['locks','locks-v1']];
 let sess=null,S={},busy=false,status={};
 try{sess=JSON.parse(localStorage.getItem(SK))}catch(e){}
@@ -25,7 +25,21 @@ function setLoc(k,s){
 }
 const isEmpty=(k,s)=>k==='meta'?(!s||s===EMPTY_META):!s;
 
+// При нескольких серверах один раз за запуск проверяем их одновременно (это безопасный запрос) и берём самый быстрый
+let picked=APIS.length<2;
+async function pickBest(){
+  picked=true;
+  try{
+    const i=await Promise.any(APIS.map(async(u,k)=>{
+      const c=new AbortController(),tm=setTimeout(()=>c.abort(),7000);
+      try{const r=await fetch(u,{cache:'no-store',signal:c.signal});const j=await r.json();if(!j||!j.ok)throw new Error('bad');return k}
+      finally{clearTimeout(tm)}
+    }));
+    if(i!==apiI){apiI=i;localStorage.setItem('api-i',String(i))}
+  }catch(e){}
+}
 async function call(o){
+  if(!picked)await pickBest();
   let last=null;
   for(let n=0;n<APIS.length;n++){
     const i=(apiI+n)%APIS.length,c=new AbortController(),tm=setTimeout(()=>c.abort(),APIS.length>1?10000:20000);
@@ -179,7 +193,7 @@ async function logout(){
   if(!ok&&!confirm('Последние изменения не удалось отправить на сервер, они будут потеряны. Всё равно выйти?')){busy=false;return}
   let ep='';try{ep=JSON.parse(localStorage.getItem('push-sub')).endpoint}catch(e){}
   try{await sc({op:'logout',ep})}catch(e){}
-  Object.values(LOC).concat(['feat-v1','locks-v1','push-sub','chat-peers-v1','chat-seen-v1','chat-files-v1','store-v1',SK,RK]).forEach(k=>localStorage.removeItem(k));
+  Object.values(LOC).concat(['feat-v1','locks-v1','push-sub','chat-peers-v1','chat-seen-v1','chat-files-v1','store-v1','money-v1','sched-v1',SK,RK]).forEach(k=>localStorage.removeItem(k));
   const r=indexedDB.open('crm-media',1);
   r.onupgradeneeded=()=>r.result.createObjectStore('m',{keyPath:'id'});
   r.onsuccess=()=>{const t=r.result.transaction('m','readwrite');t.objectStore('m').clear();t.oncomplete=()=>location.reload()};

@@ -77,7 +77,8 @@ function vList(){
   return h;
 }
 function vCard(p){
-  const m=[...p.meets].sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id))[0];
+  const td=iso(new Date());
+  const m=p.meets.filter(x=>x.date>=td).sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id))[0];
   const inf=(k,v)=>v?`<div class="inf"><span>${k}</span><span>${v}</span></div>`:'';
   const blk=(t,s)=>s?`<h2>${t}</h2><p class="txt">${esc(s)}</p>`:'';
   const ck=(f,t)=>`<label class="ck"><input type="checkbox" data-f="${f}" ${p[f]?'checked':''}> ${t}</label>`;
@@ -88,8 +89,8 @@ function vCard(p){
   <div class="acts"><button class="sm" data-a="edit">Изменить</button><button class="sm" data-a="media">Медиа · ${p.media.length}</button></div>
   ${inf('Познакомились',esc(met(p)))}${inf('День рождения',p.bday?fdate(p.bday):'')}${inf('Телефон',p.phone?tel(p.phone):'')}${inf('Соцсети',lines(p.socials||''))}
   ${blk('Личная информация',p.bio)}${blk('Ключевые воспоминания',p.memories)}${blk('Совместные планы',p.plans)}
-  <h2>Последняя встреча</h2>
-  <div class="w" data-a="meets">${m?`<b>${fdate(m.date)}</b><div class="clip">${esc(m.text)}</div>${p.meets.length>1?`<div class="mute" style="margin-top:6px">Всего встреч: ${p.meets.length}. Нажмите, чтобы открыть историю.</div>`:''}`:'<span class="mute">Встреч пока нет. Нажмите, чтобы добавить.</span>'}</div>
+  <h2>Предстоящая встреча</h2>
+  <div class="w" data-a="meets">${m?`<b>${fdate(m.date)}</b><div class="clip">${esc(m.text)}</div>${p.meets.length>1?`<div class="mute" style="margin-top:6px">Всего встреч в списке: ${p.meets.length}. Нажмите, чтобы открыть все.</div>`:''}`:'<span class="mute">Предстоящих встреч нет. Нажмите, чтобы запланировать или посмотреть прошедшие.</span>'}</div>
   <h2>Общий круг</h2>
   ${ln.map(q=>mini(q,false)).join('')}
   <button class="ghost" data-a="linkpick">+ Связать с карточкой</button>
@@ -152,8 +153,10 @@ async function delPerson(id){
 }
 function meetsSheet(p){
   const ms=[...p.meets].sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+  const td=iso(new Date()),mrow=m=>`<div class="day"><div class="dh"><b>${fdate(m.date)}</b><button class="del" style="padding:0" data-md="${m.id}">Удалить</button></div><div class="txt">${esc(m.text)}</div></div>`;
+  const upc=ms.filter(m=>m.date>=td).reverse(),pst=ms.filter(m=>m.date<td);
   openSheet(`<h2>Встречи</h2><label>Дата<input type="date" id="mt_d" value="${iso(new Date())}"></label><label>Заметка<textarea id="mt_t" rows="3"></textarea></label><button class="primary" id="mt_s">Добавить встречу</button>
-  ${ms.map(m=>`<div class="day"><div class="dh"><b>${fdate(m.date)}</b><button class="del" style="padding:0" data-md="${m.id}">Удалить</button></div><div class="txt">${esc(m.text)}</div></div>`).join('')}
+  ${upc.length?'<h2>Предстоящие</h2>'+upc.map(mrow).join(''):''}${pst.length?'<h2>Прошедшие</h2>'+pst.map(mrow).join(''):''}
   <button class="ghost" id="mt_x">Закрыть</button>`);
   $('#mt_x').onclick=closeSheet;
   $('#mt_s').onclick=()=>{
@@ -219,7 +222,7 @@ document.addEventListener('click',e=>{
 <li>Порядок групп сверху вниз: «был секс»; без отметок; «был секс» и «общение закончено»; «её друг»; только «общение закончено». Между группами увеличенный отступ. Внутри группы по алфавиту.</li></ul>
 <h2>Внутри карточки</h2>
 <ul><li><b>Изменить</b>: правка всех полей, фото и удаление карточки.</li>
-<li><b>Последняя встреча</b>: виджет показывает дату и заметку последней встречи. Нажмите на него, чтобы увидеть всю историю, добавить встречу (дата и текст) или удалить ненужную.</li>
+<li><b>Предстоящая встреча</b>: виджет показывает ближайшую запланированную встречу (дата и заметка). Нажмите на него, чтобы увидеть все встречи, предстоящие и прошедшие, запланировать новую или удалить ненужную.</li>
 <li><b>Общий круг</b>: «+ Связать с карточкой» связывает людей с общими знакомыми. Связь двусторонняя: она появится в обеих карточках. Нажмите на виджет связанного человека, чтобы перейти к его карточке.</li>
 <li><b>Отметки</b>: «был секс», «общение закончено», «её друг». Поставить и снять «был секс» можно только после подтверждения. Пока заполнены «Заметки о сексе», отметку снять нельзя: сначала очистите заметки. У «общение закончено» появляется поле «Причина».</li>
 <li>Текстовые поля отметок сохраняются автоматически, когда вы выходите из поля.</li></ul>

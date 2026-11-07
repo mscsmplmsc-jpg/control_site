@@ -79,6 +79,8 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
   <button class="tile" data-go="crm" style="margin-top:12px"><b>CRM</b><span>Карточки знакомых</span></button>
   <button class="tile" data-go="rem" style="margin-top:12px"><b>Напоминания</b><span>Уведомления в нужное время</span></button>
   <button class="tile" data-go="tsk" style="margin-top:12px"><b>Список задач</b><span>Проекты, подзадачи, сроки и приоритеты</span></button>
+  <button class="tile" data-go="money" style="margin-top:12px"><b>Денежные потоки</b><span>Доходы и расходы по категориям и датам</span></button>
+  <button class="tile" data-go="sched" style="margin-top:12px"><b>Расписание</b><span>Недельное расписание и разовые события</span></button>
   <button class="tile" id="chattile" data-go="chat" hidden style="margin-top:12px"><b>Мессенджер</b><span>Зашифрованные сообщения и файлы</span></button>
   <div style="text-align:center;margin-top:26px"><button class="ghost" id="acctbtn" hidden style="font-size:14px;color:var(--mute);margin-right:18px">Аккаунт</button><button class="ghost" id="codebtn" style="font-size:14px;color:var(--mute)">Ввести код</button></div>
 </section>
@@ -145,6 +147,16 @@ details p{font-size:14px;color:var(--mute);margin:10px 0}
   <h1>Хранилище</h1>
   <div id="storebody"></div>
 </section>
+<section id="money" hidden>
+  <div class="bar"><button class="back" data-go="menu">‹ Меню</button><button class="lockbtn" data-lock="money">Пароль</button></div>
+  <h1>Денежные потоки</h1>
+  <div id="moneybody"></div>
+</section>
+<section id="sched" hidden>
+  <div class="bar"><button class="back" data-go="menu">‹ Меню</button><button class="lockbtn" data-lock="sched">Пароль</button></div>
+  <h1>Расписание</h1>
+  <div id="schedbody"></div>
+</section>
 <footer class="ft">made by: <a href="https://vk.ru/ferretartem" target="_blank" rel="noopener noreferrer">ArtemoWitch</a></footer>
 </main>
 <div id="md" hidden><div id="sheet"></div></div>
@@ -195,7 +207,7 @@ function lockSheet(sec){
 
 /* секретные коды */
 const FK='feat-v1';let feat={};try{feat=JSON.parse(localStorage.getItem(FK))||{}}catch(e){}
-const CODES={marks:'da6dad2aebb03ee105f7d36e3621333894a15d40a01ce2a4069a69f95df179aa',chat:'1d2d651d74e62bb2fff5b89dfcd9d032364cbc31176a83a7eea67874a65a1266',garden:'e56070f24b37b1e488c12f359f0555fde52c242df2b34764a443a4f981724eb6',menu:'0ea10fcf69e8076f5a6c0624c7553b25feb6520ce390b0cfe0ec365852803222'};
+const CODES={marks:'da6dad2aebb03ee105f7d36e3621333894a15d40a01ce2a4069a69f95df179aa',chat:'1d2d651d74e62bb2fff5b89dfcd9d032364cbc31176a83a7eea67874a65a1266',garden:'e56070f24b37b1e488c12f359f0555fde52c242df2b34764a443a4f981724eb6',menu:'0ea10fcf69e8076f5a6c0624c7553b25feb6520ce390b0cfe0ec365852803222',watch:'219b044599a651d5da72decba42bd570e57ee6da8bec2b5e50eff1085b34084e'};
 // Список кодов хранится в зашифрованном виде: прочитать его можно только введя код меню
 const MENU_BLOB='B9V13AxwDTgqhljM3FpC5l3inzA8hWxbComMx6gbU2TtnfhVMGfHbbXU1SAbF479X9KlgYxP144RcOTxv833Sk0OVW5wvr66epbJyDltHiWIgl4tBsJQhFB/LGrjNFVwcsoLiFOdsrAuGNGexgMpCvsp/jPDBFgqpztEvl5ulbqqI+n5cUlywFfUjEttxcB21Bdgn23GxT3Sq67ToSI2fXkw/8NJ/4NT7boLXiIVNGvAn9rT0BGbFG623mc1FnwKMZCQzo+ucPtyeqXGnpeyJvr5A0r75WqbtFbMZz7Z/0TXWcBoaHVRaYSpE6MDhE6c7HYVhiIa8YOjh4d34pKIwbvPSqyTnqkwJmie8NXKkhIVnmN+pos/2Dnw6USpNOVMBNahrBInqvX2BjEbE7i0vlMQ3ATrhnzURhQCqVUHtELdvvpSKh7HUSR3A4JJPcZUYdiR5d/U1IBKeuw/rXX3EetrHXVO6xGj26Q6wmwpRQp2J9nz24SmENVDgtrlKfNYhljrb5sSmP84xmNjADeXtXe1d7FUxI5eG52HsIDCiw/kenrvUmhRmshNREBElYUcfSPWzw7jxJM2Dei65Tr8QxepRU0uPtvE/NHE5mlg/U1smsqNVkXAWUcJGgKH1o1N05YSVqFldWhXpq6k1WCTpQlKo52uD1civjENN1OdW3LNAU68FbrlfuxZvQcgzt3mSaOkVkYhkRi/01mco0kVq+tjkgRmwy+H7afdQOWi5NBwBVaCLzjj1QU+G+JIJHMGpf0RJ+DmYkt1X3j9XkbUwWAoPlMVeWevieY/mFULGQGaPXVt/jxOK+A+EBzyKAI111SAqzT/cXoE0VY85WWcj4xLiP7YZRRm8l5Q0jOpCSRWcPRfPAFOLGbqvQiGFh6APxYEECZGlXxae16T+fLUMWHWxNgY9xLXtfJJ2UhnKL+QUiVhf85O/B/upV3+vOgAN64BQF4B1i16hL/zbvbHsSpxOSvCZMh4aP8TWrDwxSBgsed0EdRnsMkBNvxPPthrjRg5v15dpYd/1nhQoXDmf9gVfw4e+8vFInHCrs5KVESFweQOaV4iq9XZckE1mX52N1rxudoKKnohnpo6X3Q8QyTnZvnIZEAsyeqlwQTPR3lt5OoPVaviX1myPqGs7FRp4Aoq9wNcH1zU8iJ6bPU0x7+rGqzOjHhY90stuOHHT4UzdXxeDX/YuY5p9g==';
 async function menuList(code){
@@ -205,11 +217,33 @@ async function menuList(code){
   return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:raw.slice(0,12)},key,raw.slice(12))));
 }
 async function sha(s){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode(s)))].map(x=>x.toString(16).padStart(2,'0')).join('')}
+// Секретная функция: оповещения о регистрации новых пользователей (в списке кодов не показывается)
+function watchSheet(){
+  openSheet('<h2>Оповещения о новых пользователях</h2><p class="mute">Включите уведомления на этом устройстве, и вы будете получать сообщение, когда в приложении зарегистрируется новый пользователь.</p><div class="err" id="w_e"></div><button class="primary" id="w_on">Включить</button><button class="ghost" id="w_x">Закрыть</button>');
+  $('#w_x').onclick=closeSheet;
+  $('#w_on').onclick=async()=>{
+    const e=m=>{$('#w_e').textContent=m};
+    try{
+      if(!window.ensurePushSub||!('PushManager' in window)||!(navigator.standalone||matchMedia('(display-mode: standalone)').matches)){e('Откройте приложение с иконки на экране «Домой».');return}
+      if(await Notification.requestPermission()!=='granted'){e('Уведомления запрещены в настройках телефона.');return}
+      const sub=await ensurePushSub();
+      await authCall({op:'subscribe',sub:sub.toJSON()});
+      const j=await authCall({op:'watch',on:true});
+      if(!j.ok)throw new Error(j.error||'сервер не ответил');
+      feat.watch=true;localStorage.setItem(FK,JSON.stringify(feat));closeSheet();toast('Оповещения о регистрациях включены');
+    }catch(x){e('Не удалось: '+(x&&x.message||x))}
+  };
+}
 $('#codebtn').onclick=()=>{
   openSheet('<h2>Введите код</h2><input id="cd" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="Код"><div class="err" id="ce"></div><button class="primary" id="cok">Применить</button><button class="ghost" id="cno">Закрыть</button>');
   const apply=async()=>{
-    const typed=$('#cd').value.trim(),h=await sha(typed),k=Object.keys(CODES).find(x=>CODES[x]===h);
+    const typed=$('#cd').value.trim().normalize('NFC'),h=await sha(typed),k=Object.keys(CODES).find(x=>CODES[x]===h);
     if(!k){$('#ce').textContent='Неверный код';return}
+    if(k==='watch'){
+      if(feat.watch){closeSheet();toast('Этот код уже введён');return}
+      if(!(window.authUser&&authUser())){$('#ce').textContent='Для этой функции нужен вход в аккаунт';return}
+      closeSheet();watchSheet();return;
+    }
     if(k==='garden'){closeSheet();go('store');return}
     if(k==='menu'){
       try{
@@ -227,8 +261,8 @@ $('#codebtn').onclick=()=>{
 /* навигация */
 async function go(id){
   if(id!=='menu'&&locks[id]&&!unlocked.has(id)&&!await askPw(id))return;
-  $('#menu').hidden=id!=='menu';$('#hours').hidden=id!=='hours';$('#crm').hidden=id!=='crm';$('#rem').hidden=id!=='rem';$('#tsk').hidden=id!=='tsk';$('#chat').hidden=id!=='chat';$('#store').hidden=id!=='store';
-  window.scrollTo(0,0);if(id==='hours')refresh();if(id==='crm'&&window.crmShow)crmShow();if(id==='rem'&&window.remShow)remShow();if(id==='tsk'&&window.tskShow)tskShow();if(id==='chat'&&window.chatShow)chatShow();if(id==='store'&&window.storeShow)storeShow();
+  $('#menu').hidden=id!=='menu';$('#hours').hidden=id!=='hours';$('#crm').hidden=id!=='crm';$('#rem').hidden=id!=='rem';$('#tsk').hidden=id!=='tsk';$('#chat').hidden=id!=='chat';$('#store').hidden=id!=='store';$('#money').hidden=id!=='money';$('#sched').hidden=id!=='sched';
+  window.scrollTo(0,0);if(id==='hours')refresh();if(id==='crm'&&window.crmShow)crmShow();if(id==='rem'&&window.remShow)remShow();if(id==='tsk'&&window.tskShow)tskShow();if(id==='chat'&&window.chatShow)chatShow();if(id==='store'&&window.storeShow)storeShow();if(id==='money'&&window.moneyShow)moneyShow();if(id==='sched'&&window.schedShow)schedShow();
 }
 
 /* правка дня */
@@ -332,7 +366,7 @@ $('#list').addEventListener('click',e=>{
 /* резервная копия */
 $('#exp').onclick=async()=>{
   const name='uchet-chasov-'+iso(new Date())+'.json';
-  const file=new File([JSON.stringify({...db,crm:window.crmGet&&crmGet(),rem:window.remGet&&remGet(),tsk:window.tskGet&&tskGet()})],name,{type:'application/json'});
+  const file=new File([JSON.stringify({...db,crm:window.crmGet&&crmGet(),rem:window.remGet&&remGet(),tsk:window.tskGet&&tskGet(),money:window.moneyGet&&moneyGet(),sched:window.schedGet&&schedGet()})],name,{type:'application/json'});
   if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return}catch(e){if(e.name==='AbortError')return}}
   const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;a.click();
 };
@@ -341,7 +375,7 @@ $('#imp').onchange=async e=>{
   try{
     const j=JSON.parse(await f.text());if(!Array.isArray(j.days))throw 0;
     if(!confirm(`Заменить текущие данные (дней: ${db.days.length}) данными из копии (дней: ${j.days.length})?`)){e.target.value='';return}
-    db={days:j.days};save();if(j.crm&&window.crmSet)crmSet(j.crm);if(j.rem&&window.remSet)remSet(j.rem);if(j.tsk&&window.tskSet)tskSet(j.tsk);refresh();renderStats();toast('Копия загружена');
+    db={days:j.days};save();if(j.crm&&window.crmSet)crmSet(j.crm);if(j.rem&&window.remSet)remSet(j.rem);if(j.tsk&&window.tskSet)tskSet(j.tsk);if(j.money&&window.moneySet)moneySet(j.money);if(j.sched&&window.schedSet)schedSet(j.sched);refresh();renderStats();toast('Копия загружена');
   }catch(x){toast('Файл не похож на копию данных')}
   e.target.value='';
 };
@@ -362,5 +396,7 @@ if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWor
 <script src="auth.js"></script>
 <script src="chat.js"></script>
 <script src="store.js"></script>
+<script src="money.js"></script>
+<script src="sched.js"></script>
 </body>
 </html>
