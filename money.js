@@ -59,7 +59,7 @@ function view(keep){
   b2.innerHTML=`<div class="nav"><button class="ghost" data-a="cats">Категории</button><button class="ghost" data-a="cur">Валюта${M.cur?' ('+esc(M.cur)+')':''}</button></div>
   <div class="tabs" style="margin:6px 0 4px"><button data-mode="month" class="${V.mode==='month'?'on':''}">Месяц</button><button data-mode="year" class="${V.mode==='year'?'on':''}">Год</button><button data-mode="all" class="${V.mode==='all'?'on':''}">Всё время</button></div>
   <div class="pn">${V.mode==='all'?'<span></span>':'<button data-a="prev" aria-label="Назад">‹</button>'}<b>${label}</b>${V.mode==='all'?'<span></span>':'<button data-a="next" aria-label="Вперёд">›</button>'}</div>
-  <div class="sumg"><div><span>Доходы</span><b class="inc">${fm(inc)}</b></div><div><span>Расходы</span><b class="exp">${fm(exp)}</b></div><div><span>Итог</span><b style="color:${bal>=0?GREEN:'var(--bad)'}">${bal<0?'−':''}${fm(Math.abs(bal))}</b></div></div>
+  <div class="sumg"><div><span>Доходы</span><b class="inc">${fm(inc)}</b></div><div><span>Итог</span><b style="color:${bal>=0?GREEN:'var(--bad)'}">${bal<0?'−':''}${fm(Math.abs(bal))}</b></div><div><span>Расходы</span><b class="exp">${fm(exp)}</b></div></div>
   <div class="seg2" style="margin:0 0 6px"><button class="bi on" data-a="new" data-t="in">+ Доход</button><button class="bo on" data-a="new" data-t="out">+ Расход</button></div>
   ${exp?'<h2>Расходы по категориям</h2>'+bars('out',exp):''}${inc?'<h2>Доходы по категориям</h2>'+bars('in',inc):''}
   ${ops.length?'<h2>Операции</h2>'+days:'<p class="mute" style="margin-top:16px">За этот период операций нет.</p>'}`;

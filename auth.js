@@ -60,6 +60,7 @@ window.authCall=o=>sc(o);
 window.authUser=()=>sess?sess.user:null;
 const sheetOpen=()=>!$('#md').hidden;
 function setStatus(s){status={s,t:Date.now()};const el=$('#ac_s');if(el)el.textContent=statusText()}
+const lastNote=()=>{try{const l=JSON.parse(localStorage.getItem('sync-last'));return l?`<p class="mute">Последнее расхождение (остались данные этого устройства): ${esc(l.keys.map(k=>NAMES[k]).join(', '))}, ${pad(new Date(l.t).getHours())}:${pad(new Date(l.t).getMinutes())}.</p>`:''}catch(e){return ''}};
 const statusText=()=>status.s==='ok'?'Синхронизировано в '+pad(new Date(status.t).getHours())+':'+pad(new Date(status.t).getMinutes()):status.s==='offline'?'Нет связи с сервером. Изменения отправятся позже.':'Ожидание синхронизации…';
 
 /* ---------- синхронизация ---------- */
@@ -69,14 +70,6 @@ async function pushKey(k,base){
   if(j.error==='conflict')return false;
   throw new Error(j.error||'push');
 }
-function askConflict(keys,docs){
-  return new Promise(res=>{
-    openSheet(`<h2>Данные отличаются</h2><p class="mute">На сервере и на этом устройстве разные данные: ${keys.map(k=>NAMES[k]).join(', ')}. Какую версию оставить? Выбранная заменит другую.</p><button class="primary" id="cf_s">Взять с сервера</button><button class="ghost" id="cf_m">Оставить с этого устройства</button>`);
-    window._sc=()=>res();
-    $('#cf_s').onclick=()=>{window._sc=null;keys.forEach(k=>{const d=docs[k];if(d){setLoc(k,d.data);S[k]={rev:d.rev,str:d.data}}});saveS();closeSheet();location.reload();res()};
-    $('#cf_m').onclick=async()=>{window._sc=null;closeSheet();try{for(const k of keys)await pushKey(k,docs[k]?docs[k].rev:0);saveS();setStatus('ok')}catch(e){setStatus('offline')}res()};
-  });
-}
 async function syncNow(){
   if(busy||!sess||sheetOpen())return;
   busy=true;
@@ -84,23 +77,29 @@ async function syncNow(){
     const j=await sc({op:'pull'});
     if(j._s===401){dropSession();return}
     if(!j.docs)throw new Error('pull');
-    let reload=false;const conflicts=[];
+    let reload=false,retry=false;const overwritten=[];
     for(const k of KEYS){
       const sv=j.docs[k],loc=getLoc(k),s=S[k];
+      // при расхождении данные этого устройства главные: молча перезаписываем ими сервер
+      const mine=async rev=>{overwritten.push(k);if(!(await pushKey(k,rev)))retry=true};
       if(!s){ // первая синхронизация этого устройства
-        if(!sv){if(isEmpty(k,loc))S[k]={rev:0,str:loc};else if(!(await pushKey(k,0)))conflicts.push(k)}
+        if(!sv){if(isEmpty(k,loc))S[k]={rev:0,str:loc};else if(!(await pushKey(k,0)))retry=true}
         else if(isEmpty(k,loc)){setLoc(k,sv.data);S[k]={rev:sv.rev,str:sv.data};reload=true}
         else if(loc===sv.data)S[k]={rev:sv.rev,str:loc};
-        else conflicts.push(k);
+        else await mine(sv.rev);
       }else{
         const dirty=loc!==s.str;
-        if(sv&&sv.rev>s.rev){if(!dirty){setLoc(k,sv.data);S[k]={rev:sv.rev,str:sv.data};reload=true}else conflicts.push(k)}
-        else if(dirty&&!(await pushKey(k,s.rev)))conflicts.push(k);
+        if(sv&&sv.rev>s.rev){
+          if(sv.data===loc)S[k]={rev:sv.rev,str:loc}; // сервер уже получил эти же данные (например, ответ потерялся)
+          else if(!dirty){setLoc(k,sv.data);S[k]={rev:sv.rev,str:sv.data};reload=true}
+          else await mine(sv.rev);
+        }else if(dirty&&!(await pushKey(k,s.rev)))retry=true;
       }
     }
     saveS();
-    if(conflicts.length){await askConflict(conflicts,j.docs);return}
+    if(overwritten.length)localStorage.setItem('sync-last',JSON.stringify({t:Date.now(),keys:overwritten}));
     setStatus('ok');
+    if(retry)setTimeout(syncNow,3000);
     if(reload)location.reload();
   }catch(e){setStatus('offline')}
   finally{busy=false}
@@ -168,7 +167,7 @@ async function login(op,remove){
 /* ---------- аккаунт ---------- */
 function acct(){
   if(!sess){localStorage.removeItem('auth-skip');gate();return}
-  openSheet(`<h2>Аккаунт</h2><p><b>${esc(sess.user)}</b></p><p class="mute" id="ac_s">${esc(statusText())}</p>
+  openSheet(`<h2>Аккаунт</h2><p><b>${esc(sess.user)}</b></p><p class="mute" id="ac_s">${esc(statusText())}</p>${lastNote()}
   <p class="mute">Тексты синхронизируются между устройствами. Фото и видео остаются только на устройстве, где их добавили.</p>
   <button class="primary" id="ac_sync">Синхронизировать сейчас</button><button class="ghost" id="ac_dev">Устройства</button><button class="ghost" id="ac_out" style="color:var(--bad)">Выйти</button><button class="ghost" id="ac_x">Закрыть</button>`);
   $('#ac_x').onclick=closeSheet;
